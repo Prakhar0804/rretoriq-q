@@ -76,6 +76,7 @@ module.exports = (req, res) => {
     req.pipe(busboy)
   } catch (err) {
     console.error('Whisper proxy setup error:', err)
-    return res.status(500).json({ error: 'Internal server error' })
+    // Return detailed error for debugging (remove in production)
+    return res.status(500).json({ error: err?.message || 'Internal server error', stack: err?.stack })
   }
 }
