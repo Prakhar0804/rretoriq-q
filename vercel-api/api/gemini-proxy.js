@@ -31,26 +31,24 @@ module.exports = async (req, res) => {
     const projectId = process.env.GEMINI_PROJECT_ID || process.env.GENERATIVE_PROJECT_ID || process.env.GCLOUD_PROJECT
     const projectLocation = process.env.GEMINI_PROJECT_LOCATION || process.env.GENERATIVE_PROJECT_LOCATION || 'global'
     if (projectId) {
-      candidates.push(`https://generativelanguage.googleapis.com/v1beta/projects/${projectId}/locations/${projectLocation}/models/${model}:generate`)
-      candidates.push(`https://generativeai.googleapis.com/v1beta/projects/${projectId}/locations/${projectLocation}/models/${model}:generate`)
-      candidates.push(`https://generativelanguage.googleapis.com/v1beta2/projects/${projectId}/locations/${projectLocation}/models/${model}:generate`)
-      candidates.push(`https://generativeai.googleapis.com/v1beta2/projects/${projectId}/locations/${projectLocation}/models/${model}:generate`)
+      candidates.push(`https://generativelanguage.googleapis.com/v1beta/projects/${projectId}/locations/${projectLocation}/models/${model}`)
+      candidates.push(`https://generativeai.googleapis.com/v1beta/projects/${projectId}/locations/${projectLocation}/models/${model}`)
+      candidates.push(`https://generativelanguage.googleapis.com/v1beta2/projects/${projectId}/locations/${projectLocation}/models/${model}`)
+      candidates.push(`https://generativeai.googleapis.com/v1beta2/projects/${projectId}/locations/${projectLocation}/models/${model}`)
     }
 
-    // Fallback to global model endpoints
-    candidates.push(`https://generativelanguage.googleapis.com/v1beta2/models/${model}:generate`)
-    candidates.push(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generate`)
-    candidates.push(`https://generativeai.googleapis.com/v1beta2/models/${model}:generate`)
-    candidates.push(`https://generativeai.googleapis.com/v1beta/models/${model}:generate`)
+    // Fallback to global model endpoints (base path; we'll append method suffixes)
+    candidates.push(`https://generativelanguage.googleapis.com/v1beta2/models/${model}`)
+    candidates.push(`https://generativelanguage.googleapis.com/v1beta/models/${model}`)
+    candidates.push(`https://generativeai.googleapis.com/v1beta2/models/${model}`)
+    candidates.push(`https://generativeai.googleapis.com/v1beta/models/${model}`)
 
     const isBearer = typeof GEMINI_KEY === 'string' && GEMINI_KEY.trim().startsWith('ya29.')
     const headersBase = { 'Content-Type': 'application/json' }
 
-    // Prepare a generative prompt body compatible with common variants
-    const body = {
-      prompt: { text: input },
-      generation: { temperature: 0.3, maxOutputTokens: 512 }
-    }
+    // Prepare the body we forward to Google's generate endpoint. The frontend sends { input } so
+    // forward the same shape. Generation settings can be added server-side if needed.
+    const body = { input }
 
     let lastError = null
     const tried = []
