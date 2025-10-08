@@ -19,15 +19,62 @@ module.exports = async (req, res) => {
     const GEMINI_KEY = process.env.GEMINI_KEY
     if (!GEMINI_KEY) return res.status(500).json({ error: 'Gemini key not configured on server.' })
 
-    const { model = 'models/text-bison-001', input } = req.body || {}
+  const { model = 'gemini-2.5-flash', input } = req.body || {}
     if (!input) return res.status(400).json({ error: 'Missing input in request body' })
 
-    const url = `https://generativeai.googleapis.com/v1beta2/${model}:generate?key=${GEMINI_KEY}`
+    // Build the endpoint and request according to Google Generative API patterns.
+    // Prefer Authorization: Bearer if GEMINI_KEY appears to be a bearer token, otherwise fall back to ?key= API key.
+    // Candidate endpoint patterns to try (some projects/APIs use different host or version)
+    const candidates = [
+      `https://generativelanguage.googleapis.com/v1beta2/models/${model}:generate`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generate`,
+      `https://generativeai.googleapis.com/v1beta2/models/${model}:generate`,
+      `https://generativeai.googleapis.com/v1beta/models/${model}:generate`
+    ]
 
-    const response = await axios.post(url, { prompt: input }, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 60000
-    })
+    const isBearer = typeof GEMINI_KEY === 'string' && GEMINI_KEY.trim().startsWith('ya29.')
+    const headersBase = { 'Content-Type': 'application/json' }
+
+    // Prepare a generative prompt body compatible with common variants
+    const body = {
+      prompt: { text: input },
+      generation: { temperature: 0.3, maxOutputTokens: 512 }
+    }
+
+    let lastError = null
+    const tried = []
+    for (const candidateUrl of candidates) {
+      try {
+        const headers = { ...headersBase }
+        let url = candidateUrl
+        if (isBearer) headers.Authorization = `Bearer ${GEMINI_KEY}`
+        else url = `${candidateUrl}?key=${encodeURIComponent(GEMINI_KEY)}`
+        tried.push(url)
+        const response = await axios.post(url, body, { headers, timeout: 60000 })
+        // If successful, return immediately
+        return res.status(response.status).json(response.data)
+      } catch (e) {
+        // If 404, try the next candidate. Otherwise keep the error and break
+        const status = e?.response?.status
+        lastError = e
+        if (status === 404) {
+          // try next candidate
+          continue
+        } else {
+          // Non-404 error; return immediately with details
+          console.error('Gemini proxy error (non-404):', e?.response?.data || e.message || e)
+          const statusCode = status || 500
+          const data = e?.response?.data || { error: e.message }
+          return res.status(statusCode).json({ error: data, tried })
+        }
+      }
+    }
+
+    // If we exhausted candidates, return the last error with diagnostic info
+    console.error('Gemini proxy error: all endpoint candidates failed', lastError?.message || lastError)
+    const status = lastError?.response?.status || 502
+    const data = lastError?.response?.data || { error: lastError?.message || 'Failed to reach Gemini API' }
+    return res.status(status).json({ error: data, tried })
 
     return res.status(response.status).json(response.data)
   } catch (err) {
