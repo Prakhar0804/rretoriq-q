@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     const GEMINI_KEY = process.env.GEMINI_KEY
     if (!GEMINI_KEY) return res.status(500).json({ error: 'Gemini key not configured on server.' })
 
-  const { model = 'gemini-2.5-flash', input } = req.body || {}
+  const { model = 'gemini-2.0-flash', input } = req.body || {}
     if (!input) return res.status(400).json({ error: 'Missing input in request body' })
 
     // Build the endpoint and request according to Google Generative API patterns.
