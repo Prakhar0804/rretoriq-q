@@ -1,6 +1,5 @@
 const axios = require('axios')
-const BusboyModule = require('busboy')
-const Busboy = BusboyModule && (BusboyModule.Busboy || BusboyModule)
+const multiparty = require('multiparty')
 const FormData = require('form-data')
 
 function setCors(req, res) {
@@ -28,44 +27,32 @@ module.exports = (req, res) => {
   }
 
   try {
-    const busboy = new Busboy({ headers: req.headers })
-    let fileBuffer = null
-    let filename = 'recording.webm'
-    const fields = {}
+    const form = new multiparty.Form()
+    form.parse(req, async (err, fields, files) => {
+      if (err) {
+        console.error('Multiparty parse error:', err)
+        return res.status(400).json({ error: 'Invalid multipart request' })
+      }
 
-    busboy.on('file', (fieldname, file, info) => {
-      const { filename: name } = info || {}
-      if (name) filename = name
-      const chunks = []
-      file.on('data', (data) => chunks.push(data))
-      file.on('end', () => {
-        try {
-          fileBuffer = Buffer.concat(chunks)
-        } catch (e) {
-          console.error('Error concatenating file chunks:', e)
-        }
-      })
-    })
+      const fileField = files.file && files.file[0]
+      if (!fileField) return res.status(400).json({ error: 'Missing file field' })
 
-    busboy.on('field', (name, val) => {
-      fields[name] = val
-    })
-
-    busboy.on('finish', async () => {
-      if (!fileBuffer) return res.status(400).json({ error: 'Missing file field or empty upload' })
+      const filePath = fileField.path
+      const filename = fileField.originalFilename || 'recording'
+      const buffer = require('fs').readFileSync(filePath)
 
       try {
-        const form = new FormData()
-        form.append('file', fileBuffer, { filename })
-        form.append('model', 'whisper-1')
-        if (fields.language) form.append('language', fields.language)
-        if (fields.temperature) form.append('temperature', fields.temperature)
-        if (fields.response_format) form.append('response_format', fields.response_format)
+        const fd = new FormData()
+        fd.append('file', buffer, { filename })
+        fd.append('model', 'whisper-1')
+        if (fields.language && fields.language[0]) fd.append('language', fields.language[0])
+        if (fields.temperature && fields.temperature[0]) fd.append('temperature', fields.temperature[0])
+        if (fields.response_format && fields.response_format[0]) fd.append('response_format', fields.response_format[0])
 
-        const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', form, {
+        const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', fd, {
           headers: {
             Authorization: `Bearer ${OPENAI_KEY}`,
-            ...form.getHeaders()
+            ...fd.getHeaders()
           },
           timeout: 120000,
           maxContentLength: Infinity,
@@ -80,8 +67,6 @@ module.exports = (req, res) => {
         return res.status(status).json(data)
       }
     })
-
-    req.pipe(busboy)
   } catch (err) {
     console.error('Whisper proxy setup error:', err)
     // Return detailed error for debugging (remove in production)
