@@ -1,5 +1,6 @@
 const axios = require('axios')
-const Busboy = require('busboy')
+const BusboyModule = require('busboy')
+const Busboy = BusboyModule && (BusboyModule.Busboy || BusboyModule)
 const FormData = require('form-data')
 
 function setCors(req, res) {
