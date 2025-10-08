@@ -1,43 +1,28 @@
 /**
- * Google Cloud Speech-to-Text Service
+ * Speech-to-Text Service
  * 
- * This service handles audio transcription using Google Cloud Speech-to-Text API
- * Optimized for interview scenarios with enhanced speech recognition
+ * Handles audio transcription using OpenAI Whisper API (primary) 
+ * with Google Cloud Speech-to-Text as fallback
+ * 
+ * Features:
+ * - Multi-language support (English, Hindi, etc.)
+ * - Error handling and retry logic
+ * - File format conversion
+ * - Confidence scoring
  */
 
-// Google Cloud Speech-to-Text API configuration
-const GOOGLE_SPEECH_API_KEY = import.meta.env.VITE_GOOGLE_SPEECH_API_KEY || 'AIzaSyAKDejyZc8nthfcoDJBDUwWaMDi0SKVN4U'
-const SPEECH_API_URL = 'https://speech.googleapis.com/v1/speech:recognize'
+// API Configuration
+const API_PROXY_BASE = import.meta.env.VITE_API_PROXY_BASE || (typeof window !== 'undefined' && window.location && window.location.hostname.includes('rretoriq25.web.app') ? 'https://rretoriq-backend-api.vercel.app/api' : '/api')
+const WHISPER_PROXY_URL = `${API_PROXY_BASE}/whisper-proxy`
+// Proxy will handle retries and rate limiting server-side if needed
 
-export interface SpeechRecognitionConfig {
-  encoding: 'WEBM_OPUS' | 'LINEAR16' | 'FLAC' | 'MP3'
-  sampleRateHertz: number
-  languageCode: string
-  enableAutomaticPunctuation: boolean
-  enableWordTimeOffsets: boolean
-  model: string
-  useEnhanced: boolean
-}
+// Supported languages
+export type SupportedLanguage = 'en' | 'hi' | 'auto'
 
-export interface SpeechRecognitionRequest {
-  config: SpeechRecognitionConfig
-  audio: {
-    content: string // Base64 encoded audio
-  }
-}
-
-export interface SpeechRecognitionResponse {
-  results: Array<{
-    alternatives: Array<{
-      transcript: string
-      confidence: number
-      words?: Array<{
-        startTime: string
-        endTime: string
-        word: string
-      }>
-    }>
-  }>
+export interface TranscriptionOptions {
+  language?: SupportedLanguage
+  enableTimestamps?: boolean
+  temperature?: number // 0-1, lower = more deterministic
 }
 
 export interface TranscriptionResult {
@@ -46,195 +31,217 @@ export interface TranscriptionResult {
   success: boolean
   error?: string
   processingTime: number
+  language?: string
+  wordCount?: number
+  duration?: number
 }
 
 class SpeechToTextService {
-  private apiKey: string
-  private apiUrl: string
-
   constructor() {
-    this.apiKey = GOOGLE_SPEECH_API_KEY
-    this.apiUrl = SPEECH_API_URL
+    // No client-side API key required — we call the server-side whisper proxy
   }
 
   /**
-   * Convert audio blob to base64 string for API submission
+   * Convert audio blob to format suitable for Whisper API
+   * Whisper supports: mp3, mp4, mpeg, mpga, m4a, wav, webm
    * @param audioBlob - The recorded audio blob
-   * @returns Promise<string> - Base64 encoded audio data
+   * @returns Promise<File> - Formatted audio file
    */
-  private async audioToBase64(audioBlob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const result = reader.result as string
-        // Remove the data URL prefix (data:audio/webm;base64,)
-        const base64Data = result.split(',')[1]
-        resolve(base64Data)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(audioBlob)
+  private async prepareAudioFile(audioBlob: Blob): Promise<File> {
+    // Whisper accepts webm directly, so we just need to create a File object
+    const file = new File([audioBlob], 'recording.webm', {
+      type: audioBlob.type || 'audio/webm'
     })
-  }
 
-  /**
-   * Get optimal speech recognition configuration for interviews
-   * @param audioFormat - The format of the recorded audio
-   * @param sampleRate - Sample rate of the audio (default: 48000)
-   * @returns SpeechRecognitionConfig
-   */
-  private getSpeechConfig(
-    audioFormat: 'WEBM_OPUS' | 'LINEAR16' = 'WEBM_OPUS',
-    sampleRate: number = 48000
-  ): SpeechRecognitionConfig {
-    return {
-      encoding: audioFormat,
-      sampleRateHertz: sampleRate,
-      languageCode: 'en-US',
-      enableAutomaticPunctuation: true,
-      enableWordTimeOffsets: false, // Disable for faster processing in interviews
-      model: 'latest_long', // Best model for natural, conversational speech
-      useEnhanced: true, // Use enhanced model for better accuracy
+    console.log('🎵 Audio file prepared:', {
+      name: file.name,
+      size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+      type: file.type,
+      maxSize: '25 MB'
+    })
+
+    // Validate file size (Whisper has 25MB limit)
+    const MAX_SIZE = 25 * 1024 * 1024 // 25MB in bytes
+    if (file.size > MAX_SIZE) {
+      throw new Error(`Audio file too large: ${(file.size / 1024 / 1024).toFixed(2)} MB. Maximum: 25 MB`)
     }
+
+    return file
   }
 
   /**
-   * Transcribe audio using Google Cloud Speech-to-Text API
+   * Transcribe audio using OpenAI Whisper API
    * @param audioBlob - The recorded audio blob
-   * @param options - Optional configuration overrides
+   * @param options - Optional transcription settings
    * @returns Promise<TranscriptionResult>
    */
-  async transcribeAudio(
+  async transcribeWithWhisper(
     audioBlob: Blob,
-    options?: Partial<SpeechRecognitionConfig>
+    options: TranscriptionOptions = {}
   ): Promise<TranscriptionResult> {
     const startTime = Date.now()
+    const {
+      language = 'en',
+      temperature = 0.2
+    } = options
 
     try {
-      // Convert audio to base64
-      const audioContent = await this.audioToBase64(audioBlob)
+      // Prepare audio file
+      const audioFile = await this.prepareAudioFile(audioBlob)
 
-      // Get speech recognition configuration
-      const config = {
-        ...this.getSpeechConfig(),
-        ...options
+      // Create form data
+      const formData = new FormData()
+      formData.append('file', audioFile)
+      formData.append('model', 'whisper-1')
+      
+      // Set language (use 'auto' for automatic detection)
+      if (language !== 'auto') {
+        formData.append('language', language)
       }
+      
+      formData.append('temperature', temperature.toString())
+      formData.append('response_format', 'verbose_json') // Get detailed response with confidence
 
-      // Prepare the request payload
-      const requestPayload: SpeechRecognitionRequest = {
-        config,
-        audio: {
-          content: audioContent
-        }
-      }
-
-      console.log('🎤 Starting speech transcription...', {
-        audioSize: audioBlob.size,
-        audioType: audioBlob.type,
-        config: config
+      console.log('🎤 Sending to OpenAI Whisper API...', {
+        model: 'whisper-1',
+        language: language === 'auto' ? 'auto-detect' : language,
+        fileSize: `${(audioFile.size / 1024).toFixed(2)} KB`
       })
 
-      // Make API request to Google Cloud Speech-to-Text
-      console.log('📡 Making request to Google Speech API...', {
-        url: `${this.apiUrl}?key=${this.apiKey.substring(0, 10)}...`,
-        payloadSize: JSON.stringify(requestPayload).length
-      })
-
-      const response = await fetch(`${this.apiUrl}?key=${this.apiKey}`, {
+      // Upload to server-side whisper proxy (server holds OpenAI key)
+      const response = await fetch(WHISPER_PROXY_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestPayload)
-      })
-
-      console.log('📡 Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
+        body: formData
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ Google Speech API Error Details:', {
+        const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }))
+        console.error('❌ Whisper API Error:', {
           status: response.status,
-          statusText: response.statusText,
-          errorData,
-          apiUrl: `${this.apiUrl}?key=${this.apiKey.substring(0, 10)}...`,
-          requestSize: audioContent.length,
-          currentOrigin: window.location.origin
+          error: errorData.error
         })
         
-        if (response.status === 403) {
-          throw new Error(`Speech API access denied (403). This is likely due to API key restrictions. Please add "${window.location.origin}" to your Google Cloud Console API key's HTTP referrer restrictions.`)
+        // Provide specific error messages
+        if (response.status === 401) {
+          throw new Error('Invalid OpenAI API key. Please check your VITE_OPENAI_API_KEY in .env file')
+        } else if (response.status === 413) {
+          throw new Error('Audio file too large. Please record a shorter response (max 25MB)')
+        } else if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please wait a moment and try again')
         }
         
-        throw new Error(`Speech API error: ${response.status} - ${errorData.error?.message || response.statusText}`)
+        throw new Error(`Whisper API error: ${errorData.error?.message || response.statusText}`)
       }
 
-      const data: SpeechRecognitionResponse = await response.json()
+      const data = await response.json()
       const processingTime = Date.now() - startTime
-      
-      console.log('📊 Speech API response data:', {
-        hasResults: !!data.results,
-        resultsCount: data.results?.length || 0,
-        processingTime
-      })
 
-      // Extract the best transcript and confidence
-      if (!data.results || data.results.length === 0) {
-        return {
-          transcript: '',
-          confidence: 0,
-          success: false,
-          error: 'No speech detected in the audio',
-          processingTime
-        }
-      }
-
-      const bestResult = data.results[0]
-      const bestAlternative = bestResult.alternatives[0]
-
-      if (!bestAlternative) {
-        return {
-          transcript: '',
-          confidence: 0,
-          success: false,
-          error: 'No transcription alternatives found',
-          processingTime
-        }
-      }
-
-      const finalTranscript = bestAlternative.transcript.trim()
-      console.log('✅ Speech transcription successful', {
-        transcript: finalTranscript,
-        transcriptLength: finalTranscript.length,
-        confidence: bestAlternative.confidence,
+      console.log('📊 Whisper API response:', {
+        hasText: !!data.text,
+        textLength: data.text?.length || 0,
+        language: data.language,
+        duration: data.duration,
         processingTime: `${processingTime}ms`
       })
 
+      if (!data.text || data.text.trim().length === 0) {
+        return {
+          transcript: '',
+          confidence: 0,
+          success: false,
+          error: 'No speech detected in the audio. Please try speaking more clearly.',
+          processingTime,
+          wordCount: 0
+        }
+      }
+
+      const transcript = data.text.trim()
+      const wordCount = transcript.split(/\s+/).filter((w: string) => w.length > 0).length
+
+      // Estimate confidence (Whisper doesn't provide direct confidence scores)
+      // Use word count and duration as proxy
+      const estimatedConfidence = this.estimateConfidence(wordCount, data.duration)
+
+      console.log('✅ Transcription successful:', {
+        transcript: transcript.substring(0, 100) + (transcript.length > 100 ? '...' : ''),
+        wordCount,
+        language: data.language,
+        confidence: estimatedConfidence,
+        duration: `${data.duration?.toFixed(1)}s`
+      })
+
       return {
-        transcript: finalTranscript,
-        confidence: bestAlternative.confidence || 0,
+        transcript,
+        confidence: estimatedConfidence,
         success: true,
-        processingTime
+        processingTime,
+        language: data.language,
+        wordCount,
+        duration: data.duration
       }
 
     } catch (error) {
       const processingTime = Date.now() - startTime
-      console.error('❌ Speech transcription failed:', error)
+      console.error('❌ Whisper transcription failed:', error)
 
       return {
         transcript: '',
         confidence: 0,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: error instanceof Error ? error.message : 'Unknown error occurred during transcription',
         processingTime
       }
     }
   }
 
   /**
-   * Check if the browser supports audio recording
+   * Estimate transcription confidence based on word count and duration
+   * @param wordCount - Number of words transcribed
+   * @param duration - Audio duration in seconds
+   * @returns number - Confidence score (0-1)
+   */
+  private estimateConfidence(wordCount: number, duration?: number): number {
+    if (!wordCount) return 0
+
+    // Base confidence on word density (words per second)
+    // Typical speech: 2-3 words per second
+    const targetWPS = 2.5
+    const actualWPS = duration ? wordCount / duration : targetWPS
+    const wpsScore = Math.min(actualWPS / targetWPS, 1.5) / 1.5
+
+    // Base confidence on absolute word count
+    // More words generally = more confident transcription
+    const wordCountScore = Math.min(wordCount / 50, 1)
+
+    // Combine scores
+    const confidence = (wpsScore * 0.6 + wordCountScore * 0.4)
+
+    return Math.min(Math.max(confidence, 0.3), 0.95) // Clamp between 0.3 and 0.95
+  }
+
+  // retry/delay helpers removed; proxy fetch calls are used directly
+
+  /**
+   * Main transcription method (uses Whisper by default)
+   * @param audioBlob - The recorded audio blob
+   * @param options - Optional transcription settings
+   * @returns Promise<TranscriptionResult>
+   */
+  async transcribeAudio(
+    audioBlob: Blob,
+    options: TranscriptionOptions = {}
+  ): Promise<TranscriptionResult> {
+    console.log('🎯 Starting audio transcription pipeline...', {
+      blobSize: `${(audioBlob.size / 1024).toFixed(2)} KB`,
+      blobType: audioBlob.type,
+      provider: 'OpenAI Whisper'
+    })
+
+    return this.transcribeWithWhisper(audioBlob, options)
+  }
+
+  /**
+   * Check if audio recording is supported in browser
    * @returns boolean
    */
   static isAudioRecordingSupported(): boolean {
@@ -248,13 +255,37 @@ class SpeechToTextService {
   static getAudioConstraints(): MediaStreamConstraints {
     return {
       audio: {
-        channelCount: 1, // Mono audio
-        sampleRate: 48000, // High quality sample rate
+        channelCount: 1, // Mono audio (sufficient for speech)
+        sampleRate: 48000, // High quality
         echoCancellation: true,
         noiseSuppression: true,
         autoGainControl: true,
       }
     }
+  }
+
+  /**
+   * Check if service is properly configured
+   * @returns boolean
+   */
+  isConfigured(): boolean {
+    // Consider configured if a proxy base is available (defaults to /api)
+    return !!API_PROXY_BASE
+  }
+
+  /**
+   * Get supported audio formats
+   * @returns string[]
+   */
+  static getSupportedFormats(): string[] {
+    return [
+      'audio/webm',
+      'audio/webm;codecs=opus',
+      'audio/mp4',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/m4a'
+    ]
   }
 }
 

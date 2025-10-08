@@ -5,10 +5,9 @@
  * Provides detailed feedback, scoring, and improvement suggestions
  */
 
-// OpenAI API configuration
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
-// Note: API key should be added to environment variables
-const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || ''
+// Proxy configuration - call server-side proxy which holds API keys
+const API_PROXY_BASE = import.meta.env.VITE_API_PROXY_BASE || (typeof window !== 'undefined' && window.location && window.location.hostname.includes('rretoriq25.web.app') ? 'https://rretoriq-backend-api.vercel.app/api' : '/api')
+const OPENAI_PROXY_URL = `${API_PROXY_BASE}/openai-proxy`
 
 export interface InterviewQuestion {
   id: string
@@ -56,12 +55,8 @@ export interface AnalysisRequest {
 }
 
 class OpenAIAnalysisService {
-  private apiKey: string
-  private apiUrl: string
-
   constructor() {
-    this.apiKey = OPENAI_API_KEY
-    this.apiUrl = OPENAI_API_URL
+    // No client-side API key required — we call server-side proxy
   }
 
   /**
@@ -140,10 +135,6 @@ Focus on providing constructive, actionable feedback that helps the candidate im
     const startTime = Date.now()
 
     try {
-      if (!this.apiKey) {
-        throw new Error('OpenAI API key not configured')
-      }
-
       const prompt = this.generateAnalysisPrompt(
         request.question,
         request.transcript,
@@ -157,25 +148,17 @@ Focus on providing constructive, actionable feedback that helps the candidate im
         duration: request.audioDuration
       })
 
-      const response = await fetch(this.apiUrl, {
+      // Send request to server-side proxy which will attach the API key
+      const response = await fetch(OPENAI_PROXY_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4-turbo-preview', // Use GPT-4 Turbo for best analysis quality
+          model: 'gpt-4-turbo-preview',
           messages: [
-            {
-              role: 'system',
-              content: 'You are an expert interview coach and HR professional with extensive experience in candidate evaluation. Provide detailed, constructive feedback.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
+            { role: 'system', content: 'You are an expert interview coach and HR professional with extensive experience in candidate evaluation. Provide detailed, constructive feedback.' },
+            { role: 'user', content: prompt }
           ],
-          temperature: 0.3, // Lower temperature for more consistent analysis
+          temperature: 0.3,
           max_tokens: 2000,
           response_format: { type: 'json_object' }
         })
@@ -307,7 +290,8 @@ Focus on providing constructive, actionable feedback that helps the candidate im
    * @returns boolean
    */
   isConfigured(): boolean {
-    return !!this.apiKey && this.apiKey.length > 0
+    // Consider the service configured if proxy base is provided (defaults to /api)
+    return !!API_PROXY_BASE
   }
 }
 
