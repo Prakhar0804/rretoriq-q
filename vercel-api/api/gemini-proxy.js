@@ -1,13 +1,13 @@
 export default async function handler(req, res) {
   // ✅ Allow cross-origin requests from your frontend
-  res.setHeader("Access-Control-Allow-Origin", "https://rretoriq25.web.app");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+ res.setHeader("Access-Control-Allow-Origin", "*"); // for testing, later replace with your domain
+res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ Handle preflight (OPTIONS) request directly
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+// Handle preflight
+if (req.method === "OPTIONS") {
+  return res.status(200).end();
+}
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST requests allowed" });
@@ -71,9 +71,10 @@ Return JSON like:
   console.log("✅ Gemini Parsed Output:", text);
   return res.status(200).json({ result: text });
 
-} catch (error) {
-  console.error("❌ Gemini Proxy Crash:", error);
-  return res
-    .status(500)
-    .json({ error: error.message || "Gemini Proxy internal error" });
+  } catch (error) {
+    console.error("❌ Gemini Proxy Crash:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Gemini Proxy internal error" });
+  }
 }
