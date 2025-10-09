@@ -44,37 +44,53 @@ module.exports = async (req, res) => {
     candidates.push(`https://generativeai.googleapis.com/v1beta/models/${model}`)
 
     const isBearer = typeof GEMINI_KEY === 'string' && GEMINI_KEY.trim().startsWith('ya29.')
-    const headersBase = { 'Content-Type': 'application/json' }
+    const headersBase = { 'Content-Type': 'application/json', Accept: 'application/json' }
 
-    // Prepare the body we forward to Google's generate endpoint. The frontend sends { input } so
-    // forward the same shape. Generation settings can be added server-side if needed.
-    const body = { input }
+    // Prepare multiple candidate body shapes to support different Google Generative API variants.
+    // The frontend sends { input } so try that first, then fall back to common alternatives.
+    const bodyVariants = [
+      { input },
+      { prompt: { text: input } },
+      { prompt: input },
+      { text: input }
+    ]
 
     let lastError = null
     const tried = []
-    const suffixes = [':generateContent', ':generate']
+    // Include an attempt without any suffix (some endpoints accept model URL directly)
+    const suffixes = ['', ':generateContent', ':generate']
     for (const candidateUrl of candidates) {
       for (const suffix of suffixes) {
-        try {
-          const headers = { ...headersBase }
-          let url = `${candidateUrl}${suffix}`
-          if (isBearer) headers.Authorization = `Bearer ${GEMINI_KEY}`
-          else url = `${url}?key=${encodeURIComponent(GEMINI_KEY)}`
+        const urlBase = `${candidateUrl}${suffix}`
+        // Try all body variants for this url/suffix until one succeeds
+        for (const body of bodyVariants) {
+          try {
+            const headers = { ...headersBase }
+            let url = urlBase
+            if (isBearer) headers.Authorization = `Bearer ${GEMINI_KEY}`
+            else url = `${url}?key=${encodeURIComponent(GEMINI_KEY)}`
 
-          // Mask any API key in the URL before recording it in diagnostics
-          const maskedUrl = url.replace(/([?&]key=)[^&]+/i, '$1[REDACTED]')
-          tried.push(maskedUrl)
+            // Mask any API key in the URL before recording it in diagnostics
+            const maskedUrl = url.replace(/([?&]key=)[^&]+/i, '$1[REDACTED]')
+            tried.push({ url: maskedUrl, bodyShape: Object.keys(body) })
 
-          const response = await axios.post(url, body, { headers, timeout: 60000 })
-          // If successful, return immediately
-          return res.status(response.status).json(response.data)
-        } catch (e) {
-          const status = e?.response?.status
-          lastError = e
-          if (status === 404) {
-            continue
-          } else {
-            console.error('Gemini proxy error (non-404):', e?.response?.data || e.message || e)
+            const response = await axios.post(url, body, { headers, timeout: 60000 })
+            // If successful, return immediately
+            return res.status(response.status).json(response.data)
+          } catch (e) {
+            const status = e?.response?.status
+            lastError = e
+            // If the path wasn't found, try next candidate
+            if (status === 404) {
+              break // break bodyVariants loop and try next suffix/candidate
+            }
+            // If payload schema mismatch (400), try next body variant rather than failing immediately
+            if (status === 400) {
+              // continue to next body variant
+              continue
+            }
+            // For auth errors or other server errors, return immediately
+            console.error('Gemini proxy error (non-404/400):', e?.response?.data || e.message || e)
             const statusCode = status || 500
             const data = e?.response?.data || { error: e.message }
             return res.status(statusCode).json({ error: data, tried })
@@ -85,11 +101,9 @@ module.exports = async (req, res) => {
 
     // If we exhausted candidates, return the last error with diagnostic info
     console.error('Gemini proxy error: all endpoint candidates failed', lastError?.message || lastError)
-    const status = lastError?.response?.status || 502
-    const data = lastError?.response?.data || { error: lastError?.message || 'Failed to reach Gemini API' }
-    return res.status(status).json({ error: data, tried })
-
-    return res.status(response.status).json(response.data)
+  const status = lastError?.response?.status || 502
+  const data = lastError?.response?.data || { error: lastError?.message || 'Failed to reach Gemini API' }
+  return res.status(status).json({ error: data, tried })
   } catch (err) {
     console.error('Gemini proxy error:', err?.response?.data || err.message || err)
     const status = err?.response?.status || 500
