@@ -28,14 +28,17 @@ if (req.method === "OPTIONS") {
   }
 
   // Map common model names to actual v1beta model names
+  // Gemini 2.0 Flash models use different naming in v1beta
+  // Try: gemini-2.0-flash-exp (experimental version available in v1beta)
   const modelMapping = {
-    'gemini-2.0-flash': 'gemini-pro',
-    'gemini-2.0-flash-exp': 'gemini-pro',
-    'gemini-1.5-flash': 'gemini-pro',
-    'gemini-1.5-pro': 'gemini-pro'
+    'gemini-2.0-flash': 'gemini-2.0-flash-exp',
+    'gemini-2.0-flash-exp': 'gemini-2.0-flash-exp',
+    'gemini-1.5-flash': 'gemini-2.0-flash-exp',
+    'gemini-1.5-pro': 'gemini-2.0-flash-exp',
+    'gemini-pro': 'gemini-2.0-flash-exp'
   };
   
-  const geminiModel = modelMapping[model] || model || 'gemini-pro';
+  const geminiModel = modelMapping[model] || 'gemini-2.0-flash-exp';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
   const payload = {
