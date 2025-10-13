@@ -1,13 +1,16 @@
 import React from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
+import { HelmetProvider } from 'react-helmet-async'
 
 // Custom render function that includes providers
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
   return (
-    <BrowserRouter>
-      {children}
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        {children}
+      </BrowserRouter>
+    </HelmetProvider>
   )
 }
 

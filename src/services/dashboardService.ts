@@ -2,12 +2,9 @@ import {
   collection,
   query,
   where,
-  orderBy,
-  limit,
   getDocs
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
-import type { InterviewSession } from '../types/interview'
 
 interface DashboardStats {
   totalSessions: number
@@ -41,29 +38,31 @@ interface SkillBreakdown {
 class DashboardService {
   async getUserStats(userId: string): Promise<DashboardStats> {
     try {
+      // Simplified query - filter by userId only
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
         startTime: doc.data().startTime?.toDate(),
-        endTime: doc.data().endTime?.toDate(),
-        createdAt: doc.data().createdAt?.toDate()
-      })) as InterviewSession[]
+        endTime: doc.data().endTime?.toDate()
+      }))
+
+      // Filter completed sessions in memory
+      const sessions = allSessions.filter((s: any) => s.status === 'completed') as any[]
 
       // Calculate statistics
       const totalSessions = sessions.length
-      const completedSessions = sessions.filter(s => s.status === 'completed')
+      const completedSessions = sessions.filter((s: any) => s.status === 'completed')
       
-      const scores = completedSessions.map(s => s.overallScore || 0).filter(s => s > 0)
-      const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+      const scores = completedSessions.map((s: any) => s.averageScore || 0).filter((s: number) => s > 0)
+      const averageScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0
       
-      const totalPracticeTime = completedSessions.reduce((total, session) => {
+      const totalPracticeTime = completedSessions.reduce((total: number, session: any) => {
         return total + (session.totalDuration || 0)
       }, 0)
 
@@ -72,10 +71,10 @@ class DashboardService {
       const oldSessions = completedSessions.slice(0, 5)
       
       const recentAvg = recentSessions.length > 0 
-        ? recentSessions.reduce((sum, s) => sum + (s.overallScore || 0), 0) / recentSessions.length 
+        ? recentSessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / recentSessions.length 
         : 0
       const oldAvg = oldSessions.length > 0 
-        ? oldSessions.reduce((sum, s) => sum + (s.overallScore || 0), 0) / oldSessions.length 
+        ? oldSessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / oldSessions.length 
         : 0
       
       const improvementRate = oldAvg > 0 ? ((recentAvg - oldAvg) / oldAvg) * 100 : 0
@@ -84,9 +83,9 @@ class DashboardService {
       let streakDays = 0
       const today = new Date()
       const sessionDates = completedSessions
-        .map(s => s.createdAt)
-        .filter(date => date)
-        .sort((a, b) => b!.getTime() - a!.getTime())
+        .map((s: any) => s.startTime)
+        .filter((date: any) => date)
+        .sort((a: any, b: any) => b!.getTime() - a!.getTime())
 
       if (sessionDates.length > 0) {
         const uniqueDates = [...new Set(sessionDates.map(date => date!.toDateString()))]
@@ -108,7 +107,7 @@ class DashboardService {
       return {
         totalSessions,
         averageScore: Math.round(averageScore * 10) / 10,
-        totalPracticeTime: Math.floor(totalPracticeTime / 60), // Convert to minutes
+        totalPracticeTime, // Keep in seconds, will be converted to hours in display
         achievementsCount: Math.floor(totalSessions / 5) + (averageScore > 7 ? 2 : 0) + (streakDays > 3 ? 1 : 0),
         improvementRate: Math.round(improvementRate * 10) / 10,
         streakDays
@@ -128,36 +127,47 @@ class DashboardService {
 
   async getRecentSessions(userId: string, limitCount: number = 4): Promise<SessionSummary[]> {
     try {
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      
-      return sessionsSnapshot.docs.map(doc => {
-        const data = doc.data()
-        const createdAt = data.createdAt?.toDate()
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        startTime: doc.data().startTime?.toDate()
+      }))
+
+      // Filter, sort, and limit in memory
+      return allSessions
+        .filter((session: any) => session.status === 'completed')
+        .sort((a: any, b: any) => {
+          const timeA = a.startTime?.getTime() || 0
+          const timeB = b.startTime?.getTime() || 0
+          return timeB - timeA
+        })
+        .slice(0, limitCount)
+        .map((data: any) => {
+        const startTime = data.startTime
         const totalDuration = data.totalDuration || 0
         
-        // Determine session type based on questions
-        let sessionType = 'Mixed Interview'
-        if (data.questions && data.questions.length > 0) {
-          const questionTypes = data.questions.map((q: any) => q.type)
-          const uniqueTypes = [...new Set(questionTypes)]
-          if (uniqueTypes.length === 1) {
-            sessionType = `${uniqueTypes[0]} Interview`
-          }
+        // Determine session type
+        let sessionType = data.sessionType || 'interview'
+        if (data.interviewType) {
+          sessionType = `${data.interviewType} Interview`
+        } else if (sessionType === 'ielts') {
+          sessionType = 'IELTS Speaking'
+        } else if (sessionType === 'interview') {
+          sessionType = 'Mixed Interview'
         }
 
         return {
-          id: doc.id,
+          id: data.id,
           type: sessionType,
-          score: data.overallScore || 0,
-          date: createdAt ? createdAt.toLocaleDateString() : new Date().toLocaleDateString(),
+          score: data.averageScore || 0,
+          date: startTime ? startTime.toLocaleDateString() : new Date().toLocaleDateString(),
           duration: `${Math.floor(totalDuration / 60)}m ${totalDuration % 60}s`
         }
       })
@@ -172,19 +182,28 @@ class DashboardService {
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
       
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        where('createdAt', '>=', sevenDaysAgo),
-        orderBy('createdAt', 'asc')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
-      })) as InterviewSession[]
+        startTime: doc.data().startTime?.toDate()
+      }))
+
+      // Filter and sort in memory
+      const sessions = allSessions.filter((session: any) => {
+        return session.status === 'completed' && 
+               session.startTime &&
+               session.startTime >= sevenDaysAgo
+      }).sort((a: any, b: any) => {
+        const timeA = a.startTime?.getTime() || 0
+        const timeB = b.startTime?.getTime() || 0
+        return timeA - timeB
+      }) as any[]
 
       // Group sessions by day and calculate averages by type
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -195,37 +214,21 @@ class DashboardService {
         date.setDate(date.getDate() - i)
         const dayName = dayNames[date.getDay()]
         
-        const daySessions = sessions.filter(session => {
-          if (!session.createdAt) return false
-          return session.createdAt.toDateString() === date.toDateString()
+        const daySessions = sessions.filter((session: any) => {
+          if (!session.startTime) return false
+          return session.startTime.toDateString() === date.toDateString()
         })
 
-        // Calculate average scores by question type for this day
-        const hrSessions = daySessions.flatMap(s => 
-          s.answers?.filter(a => s.questions?.find(q => q.id === a.questionId)?.type === 'HR') || []
-        )
-        const techSessions = daySessions.flatMap(s => 
-          s.answers?.filter(a => s.questions?.find(q => q.id === a.questionId)?.type === 'Technical') || []
-        )
-        const behavioralSessions = daySessions.flatMap(s => 
-          s.answers?.filter(a => s.questions?.find(q => q.id === a.questionId)?.type === 'Behavioral') || []
-        )
-
-        const hrAvg = hrSessions.length > 0 
-          ? hrSessions.reduce((sum, a) => sum + (a.feedback?.score || 0), 0) / hrSessions.length 
-          : 0
-        const techAvg = techSessions.length > 0 
-          ? techSessions.reduce((sum, a) => sum + (a.feedback?.score || 0), 0) / techSessions.length 
-          : 0
-        const behavioralAvg = behavioralSessions.length > 0 
-          ? behavioralSessions.reduce((sum, a) => sum + (a.feedback?.score || 0), 0) / behavioralSessions.length 
+        // Calculate average scores by interview type for this day
+        const avgScore = daySessions.length > 0
+          ? daySessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / daySessions.length
           : 0
 
         weeklyData.push({
           name: dayName,
-          hr: Math.round(hrAvg * 10) / 10,
-          technical: Math.round(techAvg * 10) / 10,
-          behavioral: Math.round(behavioralAvg * 10) / 10
+          hr: Math.round(avgScore * 10) / 10,
+          technical: Math.round(avgScore * 10) / 10,
+          behavioral: Math.round(avgScore * 10) / 10
         })
       }
 
@@ -247,48 +250,20 @@ class DashboardService {
 
   async getSkillsBreakdown(userId: string): Promise<SkillBreakdown[]> {
     try {
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => doc.data()) as InterviewSession[]
+      const allSessions = sessionsSnapshot.docs.map(doc => doc.data())
 
-      // Aggregate scores by question type
-      const skillScores: { [key: string]: number[] } = {
-        'HR': [],
-        'Technical': [],
-        'Behavioral': []
-      }
-
-      sessions.forEach(session => {
-        session.answers?.forEach(answer => {
-          if (answer.feedback?.score) {
-            const question = session.questions?.find(q => q.id === answer.questionId)
-            if (question && skillScores[question.type]) {
-              skillScores[question.type].push(answer.feedback.score)
-            }
-          }
-        })
-      })
-
-      // Calculate averages
-      const skillsBreakdown: SkillBreakdown[] = []
-      
-      Object.entries(skillScores).forEach(([skill, scores]) => {
-        if (scores.length > 0) {
-          const average = scores.reduce((sum, score) => sum + score, 0) / scores.length
-          skillsBreakdown.push({
-            name: skill,
-            value: Math.round(average * 10) / 10
-          })
-        }
-      })
+      // Filter completed sessions in memory
+      const sessions = allSessions.filter((s: any) => s.status === 'completed')
 
       // If no data, return default structure
-      if (skillsBreakdown.length === 0) {
+      if (sessions.length === 0) {
         return [
           { name: 'HR', value: 0 },
           { name: 'Technical', value: 0 },
@@ -296,7 +271,14 @@ class DashboardService {
         ]
       }
 
-      return skillsBreakdown
+      // Calculate average score
+      const avgScore = sessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / sessions.length
+
+      return [
+        { name: 'HR', value: Math.round(avgScore * 10) / 10 },
+        { name: 'Technical', value: Math.round(avgScore * 10) / 10 },
+        { name: 'Behavioral', value: Math.round(avgScore * 10) / 10 }
+      ]
     } catch (error) {
       console.error('Error fetching skills breakdown:', error)
       return [
@@ -317,10 +299,10 @@ class DashboardService {
       const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
       
       const todaysSessionsQuery = query(
-        collection(db, 'user_sessions'),
+        collection(db, 'sessions'),
         where('userId', '==', userId),
-        where('createdAt', '>=', startOfDay),
-        where('createdAt', '<', endOfDay)
+        where('startTime', '>=', startOfDay),
+        where('startTime', '<', endOfDay)
       )
       
       const todaysSessionsSnapshot = await getDocs(todaysSessionsQuery)

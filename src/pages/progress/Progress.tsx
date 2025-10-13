@@ -82,6 +82,7 @@ export default function Progress() {
   const [timeRange, setTimeRange] = useState('week')
   const [viewType, setViewType] = useState('overview')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<ProgressStats>({
     overallIeltsScore: 0,
     interviewAverage: 0,
@@ -99,10 +100,16 @@ export default function Progress() {
 
   useEffect(() => {
     const loadProgressData = async () => {
-      if (!user) return
+      if (!user) {
+        console.log('❌ No user found, skipping progress load')
+        return
+      }
       
+      console.log('📊 Loading progress data for user:', user.id)
       setLoading(true)
+      setError(null)
       try {
+        console.log('🔄 Fetching progress data...')
         const [statsData, sessionsData, weeklyData, skillsData, monthlyData, radarData] = await Promise.all([
           progressService.getProgressStats(user.id),
           progressService.getRecentSessions(user.id, 10),
@@ -112,6 +119,8 @@ export default function Progress() {
           progressService.getRadarData(user.id)
         ])
         
+        console.log('✅ Progress data loaded:', { statsData, sessionsData, weeklyData, skillsData, monthlyData, radarData })
+        
         setStats(statsData)
         setRecentSessions(sessionsData)
         setWeeklyProgress(weeklyData)
@@ -119,9 +128,11 @@ export default function Progress() {
         setMonthlyStats(monthlyData)
         setPerformanceRadar(radarData)
       } catch (error) {
-        console.error('Error loading progress data:', error)
+        console.error('❌ Error loading progress data:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load progress data')
       } finally {
         setLoading(false)
+        console.log('✅ Progress loading complete')
       }
     }
 
@@ -135,27 +146,72 @@ export default function Progress() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
-        <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-        <span className="ml-3 text-gray-500 font-medium">Loading progress data...</span>
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-3" />
+          <span className="text-gray-700 font-medium">Loading progress data...</span>
+            <div className="mt-4 text-left text-xs text-gray-500 bg-gray-100 rounded p-2">
+              <div><strong>Debug Info:</strong></div>
+              <div>User: {JSON.stringify(user)}</div>
+              <div>Loading: {JSON.stringify(loading)}</div>
+              <div>Error: {JSON.stringify(error)}</div>
+              <div>Stats: {JSON.stringify(stats)}</div>
+              <div>RecentSessions: {JSON.stringify(recentSessions)}</div>
+              <div>WeeklyProgress: {JSON.stringify(weeklyProgress)}</div>
+              <div>SkillBreakdown: {JSON.stringify(skillBreakdown)}</div>
+              <div>MonthlyStats: {JSON.stringify(monthlyStats)}</div>
+              <div>PerformanceRadar: {JSON.stringify(performanceRadar)}</div>
+            </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center max-w-md mx-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <p className="text-red-800 font-medium mb-2">Error Loading Progress</p>
+            <p className="text-red-600 text-sm">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Reload Page
+            </button>
+              <div className="mt-4 text-left text-xs text-gray-500 bg-gray-100 rounded p-2">
+                <div><strong>Debug Info:</strong></div>
+                <div>User: {JSON.stringify(user)}</div>
+                <div>Loading: {JSON.stringify(loading)}</div>
+                <div>Error: {JSON.stringify(error)}</div>
+                <div>Stats: {JSON.stringify(stats)}</div>
+                <div>RecentSessions: {JSON.stringify(recentSessions)}</div>
+                <div>WeeklyProgress: {JSON.stringify(weeklyProgress)}</div>
+                <div>SkillBreakdown: {JSON.stringify(skillBreakdown)}</div>
+                <div>MonthlyStats: {JSON.stringify(monthlyStats)}</div>
+                <div>PerformanceRadar: {JSON.stringify(performanceRadar)}</div>
+              </div>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       <div className="max-w-6xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8 sm:mb-12">
           <div>
-            <h1 className="text-xl sm:text-2xl font-medium text-gray-900 mb-2 sm:mb-3">Progress Analytics</h1>
-            <p className="text-gray-600 text-sm sm:text-base">Track your communication skills improvement over time</p>
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2 sm:mb-3">Progress Analytics</h1>
+            <p className="text-gray-700 text-sm sm:text-base font-medium">Track your communication skills improvement over time</p>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
             <select 
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="px-3 sm:px-4 py-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-300 focus:border-gray-300 text-xs sm:text-sm font-medium"
+              className="px-3 sm:px-4 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-300 focus:border-purple-300 text-xs sm:text-sm font-medium bg-white/80 backdrop-blur-sm"
             >
               <option value="week">Last 7 Days</option>
               <option value="month">Last 30 Days</option>
@@ -166,10 +222,10 @@ export default function Progress() {
             <div className="flex gap-1">
               <button
                 onClick={() => setViewType('overview')}
-                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                   viewType === 'overview' 
-                    ? 'bg-black text-white' 
-                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' 
+                    : 'border border-purple-200 text-gray-700 hover:bg-purple-50 bg-white/80 backdrop-blur-sm'
                 }`}
               >
                 <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
@@ -177,10 +233,10 @@ export default function Progress() {
               </button>
               <button
                 onClick={() => setViewType('detailed')}
-                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
+                className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                   viewType === 'detailed' 
-                    ? 'bg-black text-white' 
-                    : 'border border-gray-200 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg' 
+                    : 'border border-purple-200 text-gray-700 hover:bg-purple-50 bg-white/80 backdrop-blur-sm'
                 }`}
               >
                 <PieChartIcon className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
@@ -188,7 +244,7 @@ export default function Progress() {
               </button>
             </div>
             
-            <button className="border border-gray-200 text-gray-700 px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-sm font-medium">
+            <button className="border border-purple-200 text-indigo-700 px-3 sm:px-4 py-2 rounded-lg hover:bg-purple-50 transition-colors flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-sm font-medium bg-white/80 backdrop-blur-sm shadow-sm">
               <Download className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Export</span>
             </button>
@@ -197,71 +253,71 @@ export default function Progress() {
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-          <div className="border border-gray-200 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Overall IELTS Score</p>
-                <p className="text-3xl font-light text-gray-900">{stats.overallIeltsScore > 0 ? stats.overallIeltsScore.toFixed(1) : '0.0'}</p>
+                <p className="text-sm font-medium text-white/80 mb-2">General Comm Score</p>
+                <p className="text-3xl font-bold">{stats.overallIeltsScore > 0 ? stats.overallIeltsScore.toFixed(1) : '0.0'}</p>
               </div>
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-gray-600" />
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Target className="w-5 h-5 text-white" />
               </div>
             </div>
             <div className="flex items-center">
-              <TrendingUp className={`w-4 h-4 mr-2 ${stats.weeklyImprovement >= 0 ? 'text-green-600' : 'text-red-500'}`} />
-              <span className={`text-sm font-medium ${stats.weeklyImprovement >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <TrendingUp className="w-4 h-4 mr-2 text-white/80" />
+              <span className="text-sm font-medium text-white/80">
                 {stats.weeklyImprovement >= 0 ? '+' : ''}{stats.weeklyImprovement.toFixed(1)}% from last week
               </span>
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-6 text-white">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Interview Average</p>
-                <p className="text-3xl font-light text-gray-900">{stats.interviewAverage}%</p>
+                <p className="text-sm font-medium text-white/80 mb-2">Interview Average</p>
+                <p className="text-3xl font-bold">{stats.interviewAverage}%</p>
               </div>
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-                <Award className="w-5 h-5 text-gray-600" />
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Award className="w-5 h-5 text-white" />
               </div>
             </div>
             <div className="flex items-center">
-              <TrendingUp className={`w-4 h-4 mr-2 ${stats.interviewImprovement >= 0 ? 'text-green-600' : 'text-red-500'}`} />
-              <span className={`text-sm font-medium ${stats.interviewImprovement >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <TrendingUp className="w-4 h-4 mr-2 text-white/80" />
+              <span className="text-sm font-medium text-white/80">
                 {stats.interviewImprovement >= 0 ? '+' : ''}{stats.interviewImprovement}% improvement
               </span>
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Practice Hours</p>
-                <p className="text-3xl font-light text-gray-900">{stats.totalPracticeHours}</p>
+                <p className="text-sm font-medium text-white/80 mb-2">Practice Hours</p>
+                <p className="text-3xl font-bold">{Math.floor(stats.totalPracticeHours / 3600)}</p>
               </div>
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-gray-600" />
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Clock className="w-5 h-5 text-white" />
               </div>
             </div>
             <div className="flex items-center">
-              <Clock className="w-4 h-4 text-gray-600 mr-2" />
-              <span className="text-sm font-medium text-gray-600">{stats.thisWeekHours}h this week</span>
+              <Clock className="w-4 h-4 text-white/80 mr-2" />
+              <span className="text-sm font-medium text-white/80">{Math.floor(stats.thisWeekHours / 3600)}h this week</span>
             </div>
           </div>
 
-          <div className="border border-gray-200 rounded-xl p-6">
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Streak Days</p>
-                <p className="text-3xl font-light text-gray-900">{stats.streakDays}</p>
+                <p className="text-sm font-medium text-white/80 mb-2">Streak Days</p>
+                <p className="text-3xl font-bold">{stats.streakDays}</p>
               </div>
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-gray-600" />
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <Calendar className="w-5 h-5 text-white" />
               </div>
             </div>
             <div className="flex items-center">
-              <TrendingUp className="w-4 h-4 text-gray-600 mr-2" />
-              <span className="text-sm font-medium text-gray-600">{stats.streakDays > 0 ? 'Keep it up!' : 'Start your streak!'}</span>
+              <TrendingUp className="w-4 h-4 text-white/80 mr-2" />
+              <span className="text-sm font-medium text-white/80">{stats.streakDays > 0 ? 'Keep it up!' : 'Start your streak!'}</span>
             </div>
           </div>
         </div>
@@ -292,7 +348,7 @@ export default function Progress() {
                         labelFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                         formatter={(value, name) => [
                           name === 'ielts' ? `${value}/9.0` : `${value}%`,
-                          name === 'ielts' ? 'IELTS Score' : 'Interview Score'
+                          name === 'ielts' ? 'General Comm Score' : 'Interview Score'
                         ]}
                         contentStyle={{
                           backgroundColor: 'white',

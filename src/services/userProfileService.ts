@@ -6,8 +6,7 @@ import {
   collection,
   query,
   where,
-  getDocs,
-  orderBy
+  getDocs
 } from 'firebase/firestore'
 import { updateProfile, updatePassword } from 'firebase/auth'
 import { db, auth } from '../lib/firebase'
@@ -18,6 +17,7 @@ interface UserProfile {
   firstName: string
   lastName: string
   displayName?: string
+  photoURL?: string
   phone?: string
   location?: string
   dateOfBirth?: string
@@ -26,6 +26,8 @@ interface UserProfile {
   education?: string
   languages?: string
   bio?: string
+  institutionId?: string
+  institutionName?: string
   createdAt?: Date
   updatedAt?: Date
   preferences?: {
@@ -65,9 +67,24 @@ class UserProfileService {
       
       if (userDoc.exists()) {
         const data = userDoc.data()
+        let institutionName: string | undefined = undefined
+        
+        // Fetch institution name if institutionId exists
+        if (data.institutionId) {
+          try {
+            const institutionDoc = await getDoc(doc(db, 'institutions', data.institutionId))
+            if (institutionDoc.exists()) {
+              institutionName = institutionDoc.data().institutionName
+            }
+          } catch (instError) {
+            console.error('Error fetching institution:', instError)
+          }
+        }
+        
         return {
           ...data,
           uid,
+          institutionName,
           createdAt: data.createdAt?.toDate(),
           updatedAt: data.updatedAt?.toDate()
         } as UserProfile
@@ -149,24 +166,26 @@ class UserProfileService {
       const profile = await this.getUserProfile(uid)
       const memberSince = profile?.createdAt || new Date()
 
-      // Get user sessions for statistics
+      // Get user sessions for statistics - FIXED: using 'sessions' collection
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', uid),
-        where('status', '==', 'completed'),
-        orderBy('createdAt', 'desc')
+        collection(db, 'sessions'),
+        where('userId', '==', uid)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+        startTime: doc.data().startTime?.toDate(),
+        endTime: doc.data().endTime?.toDate()
       }))
+
+      // Filter completed sessions in memory
+      const sessions = allSessions.filter((s: any) => s.status === 'completed')
 
       // Calculate statistics
       const totalSessions = sessions.length
       
-      const scores = sessions.map((s: any) => s.overallScore || 0).filter(score => score > 0)
+      const scores = sessions.map((s: any) => s.averageScore || 0).filter(score => score > 0)
       const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
       
       const totalPracticeTime = sessions.reduce((total: number, session: any) => {
@@ -174,12 +193,12 @@ class UserProfileService {
       }, 0)
 
       // Get last activity
-      const lastActivity = sessions.length > 0 ? sessions[0].createdAt : null
+      const lastActivity = sessions.length > 0 && sessions[0].startTime ? sessions[0].startTime : null
 
       return {
         totalSessions,
         averageScore: Math.round(averageScore * 10) / 10,
-        totalPracticeTime, // in minutes
+        totalPracticeTime, // in seconds
         memberSince,
         lastActivity
       }
@@ -242,7 +261,9 @@ class UserProfileService {
     }
   }
 
-  formatPracticeTime(minutes: number): string {
+  formatPracticeTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60)
+    
     if (minutes < 60) {
       return `${minutes}m`
     }

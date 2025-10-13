@@ -26,7 +26,9 @@ import {
   Info,
   TrendingUp,
   MessageSquare,
-  BookOpen
+  BookOpen,
+  Building2,
+  GraduationCap
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -51,10 +53,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const authenticatedNavigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Mock Interviews', href: '/interview', icon: Users },
-    { name: 'Communication Skills', href: '/ielts', icon: MessageSquare },
-    { name: 'Grammar & Vocabulary', href: '/ai-interview', icon: BookOpen },
+    { name: "Let's Communicate", href: '/ielts', icon: MessageSquare },
+    { name: 'The Rretoriq Guide', href: '/resources', icon: BookOpen },
     { name: 'Progress', href: '/progress', icon: BarChart3 },
     { name: 'Plan Upgrade', href: '/plans', icon: TrendingUp },
+  ]
+
+  const adminNavigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Admin Portal', href: '/admin/dashboard', icon: Building2 },
+    { name: 'Students Details', href: '/admin/students', icon: GraduationCap },
+    { name: 'Progress', href: '/progress', icon: BarChart3 },
   ]
 
   const supportNavigation = [
@@ -63,7 +72,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'About Us', href: '/about', icon: Users },
   ]
 
-  const navigation = user ? authenticatedNavigation : publicNavigation
+  // Determine which navigation to show based on user role
+  const isAdmin = (user as any)?.admin === true
+  const navigation = user ? (isAdmin ? adminNavigation : authenticatedNavigation) : publicNavigation
 
   const isActive = (href: string) => {
     return location.pathname === href
@@ -83,34 +94,34 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Desktop Sidebar */}
         <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-          <div className="flex min-h-0 flex-1 flex-col bg-white border-r border-gray-100">
+          <div className="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-indigo-50 via-purple-50 to-pink-50 border-r border-purple-100 shadow-lg">
             {/* Logo */}
             <div className="flex items-center px-6 py-6">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                <Brain className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Brain className="w-6 h-6 text-white" />
               </div>
-              <span className="ml-3 text-xl font-medium text-gray-900">Rretoriq</span>
+              <span className="ml-3 text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Rretoriq</span>
             </div>
 
             {/* Navigation */}
             <nav className="mt-8 px-4 flex-1">
               {/* Main Navigation */}
               <div className="mb-6">
-                {authenticatedNavigation.map((item) => {
+                {navigation.map((item) => {
                   const Icon = item.icon
                   const isCurrentActive = isActive(item.href)
                   return (
                     <Link
                       key={item.name}
                       to={item.href}
-                      className={`group flex items-center px-3 py-2.5 mb-1 text-sm font-medium rounded-lg transition-all duration-150 ${
+                      className={`group flex items-center px-3 py-2.5 mb-1.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
                         isCurrentActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:text-indigo-600 hover:bg-white/60 hover:shadow-md'
                       }`}
                     >
                       <Icon className={`w-5 h-5 mr-3 ${
-                        isCurrentActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                        isCurrentActive ? 'text-white' : 'text-indigo-500 group-hover:text-indigo-600'
                       }`} />
                       <span>{item.name}</span>
                     </Link>
@@ -119,9 +130,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
 
               {/* Support Section */}
-              <div className="border-t border-gray-100 pt-4">
+              <div className="border-t border-purple-200 pt-4">
                 <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Support</span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Support</span>
                 </div>
                 {supportNavigation.map((item) => {
                   const Icon = item.icon
@@ -130,14 +141,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     <Link
                       key={item.name}
                       to={item.href}
-                      className={`group flex items-center px-3 py-2.5 mb-1 text-sm font-medium rounded-lg transition-all duration-150 ${
+                      className={`group flex items-center px-3 py-2.5 mb-1.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
                         isCurrentActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:text-indigo-600 hover:bg-white/60 hover:shadow-md'
                       }`}
                     >
                       <Icon className={`w-5 h-5 mr-3 ${
-                        isCurrentActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                        isCurrentActive ? 'text-white' : 'text-indigo-500 group-hover:text-indigo-600'
                       }`} />
                       <span>{item.name}</span>
                     </Link>
@@ -147,26 +158,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </nav>
 
             {/* User Profile */}
-            <div className="p-4 border-t border-gray-100">
+            <div className="p-4 border-t border-purple-200">
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 rounded-xl hover:bg-white/60 hover:shadow-md transition-all duration-200"
                 >
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-gray-600" />
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg">
+                    <User className="w-5 h-5 text-white" />
                   </div>
                   <div className="ml-3 text-left">
-                    <p className="text-sm font-medium text-gray-900">{user.firstName}</p>
-                    <p className="text-xs text-gray-500">Premium Member</p>
+                    <p className="text-sm font-bold text-gray-900">{user.firstName}</p>
+                    <p className="text-xs font-semibold text-purple-600">Premium Member</p>
                   </div>
                 </button>
                 
                 {userMenuOpen && (
-                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-lg border border-gray-200 py-2">
+                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-purple-100 py-2">
                     <Link
                       to="/profile"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => setUserMenuOpen(false)}
                     >
                       <Settings className="w-4 h-4 mr-3" />
@@ -177,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         logout()
                         setUserMenuOpen(false)
                       }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4 mr-3" />
                       <span>Sign Out</span>
@@ -190,21 +201,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Mobile Sidebar */}
-        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-100 transform transition-transform duration-300 ease-in-out lg:hidden ${
+        <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-indigo-50 via-purple-50 to-pink-50 border-r border-purple-100 shadow-2xl transform transition-transform duration-300 ease-in-out lg:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}>
           <div className="flex min-h-0 flex-1 flex-col">
             {/* Mobile Logo with Close Button */}
             <div className="flex items-center justify-between px-6 py-6">
               <div className="flex items-center">
-                <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                  <Brain className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Brain className="w-6 h-6 text-white" />
                 </div>
-                <span className="ml-3 text-xl font-medium text-gray-900">Rretoriq</span>
+                <span className="ml-3 text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Rretoriq</span>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                className="p-2 rounded-lg text-indigo-600 hover:text-purple-600 hover:bg-white/60 transition-all duration-200"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -222,14 +233,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       key={item.name}
                       to={item.href}
                       onClick={() => setSidebarOpen(false)}
-                      className={`group flex items-center px-3 py-2.5 mb-1 text-sm font-medium rounded-lg transition-all duration-150 ${
+                      className={`group flex items-center px-3 py-2.5 mb-1.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
                         isCurrentActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:text-indigo-600 hover:bg-white/60 hover:shadow-md'
                       }`}
                     >
                       <Icon className={`w-5 h-5 mr-3 ${
-                        isCurrentActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                        isCurrentActive ? 'text-white' : 'text-indigo-500 group-hover:text-indigo-600'
                       }`} />
                       <span>{item.name}</span>
                     </Link>
@@ -238,9 +249,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
 
               {/* Support Section */}
-              <div className="border-t border-gray-100 pt-4">
+              <div className="border-t border-purple-200 pt-4">
                 <div className="px-3 mb-2">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Support</span>
+                  <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">Support</span>
                 </div>
                 {supportNavigation.map((item) => {
                   const Icon = item.icon
@@ -250,14 +261,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       key={item.name}
                       to={item.href}
                       onClick={() => setSidebarOpen(false)}
-                      className={`group flex items-center px-3 py-2.5 mb-1 text-sm font-medium rounded-lg transition-all duration-150 ${
+                      className={`group flex items-center px-3 py-2.5 mb-1.5 text-sm font-semibold rounded-xl transition-all duration-200 ${
                         isCurrentActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
+                          : 'text-gray-700 hover:text-indigo-600 hover:bg-white/60 hover:shadow-md'
                       }`}
                     >
                       <Icon className={`w-5 h-5 mr-3 ${
-                        isCurrentActive ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                        isCurrentActive ? 'text-white' : 'text-indigo-500 group-hover:text-indigo-600'
                       }`} />
                       <span>{item.name}</span>
                     </Link>
@@ -267,26 +278,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </nav>
 
             {/* Mobile User Profile */}
-            <div className="p-4 border-t border-gray-100">
+            <div className="p-4 border-t border-purple-200">
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-700 rounded-xl hover:bg-white/60 hover:shadow-md transition-all duration-200"
                 >
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-gray-600" />
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg">
+                    <User className="w-5 h-5 text-white" />
                   </div>
                   <div className="ml-3 text-left">
-                    <p className="text-sm font-medium text-gray-900">{user.firstName}</p>
-                    <p className="text-xs text-gray-500">Premium Member</p>
+                    <p className="text-sm font-bold text-gray-900">{user.firstName}</p>
+                    <p className="text-xs font-semibold text-purple-600">Premium Member</p>
                   </div>
                 </button>
                 
                 {userMenuOpen && (
-                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-lg border border-gray-200 py-2">
+                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl border border-purple-100 py-2">
                     <Link
                       to="/profile"
-                      className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="flex items-center px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => {
                         setUserMenuOpen(false)
                         setSidebarOpen(false)
@@ -301,7 +312,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         setUserMenuOpen(false)
                         setSidebarOpen(false)
                       }}
-                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full flex items-center px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4 mr-3" />
                       <span>Sign Out</span>
@@ -315,20 +326,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Mobile Top Bar */}
         <div className="lg:hidden">
-          <div className="fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-200 px-4 py-3">
+          <div className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  className="p-2 rounded-lg text-white hover:bg-white/20 transition-all duration-200"
                 >
                   <Menu className="w-6 h-6" />
                 </button>
                 <div className="ml-3 flex items-center">
-                  <div className="w-6 h-6 bg-black rounded-lg flex items-center justify-center">
-                    <Brain className="w-3 h-3 text-white" />
+                  <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-md">
+                    <Brain className="w-4 h-4 text-indigo-600" />
                   </div>
-                  <span className="ml-2 text-lg font-medium text-gray-900">Rretoriq</span>
+                  <span className="ml-2 text-lg font-bold text-white">Rretoriq</span>
                 </div>
               </div>
               <div className="flex items-center">
@@ -342,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Main Content */}
         <div className="lg:ml-64 flex-1">
-          <main className="min-h-screen pt-16 lg:pt-0 p-4 lg:p-8">
+          <main className="min-h-screen pt-20 lg:pt-8 px-4 lg:px-8 pb-8">
             {children}
           </main>
         </div>
@@ -639,7 +650,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <li>
                   <Link to="/ielts" className="flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors text-sm group">
                     <MessageSquare className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span>Communication Skills</span>
+                    <span>Let's Communicate</span>
                   </Link>
                 </li>
                 <li>

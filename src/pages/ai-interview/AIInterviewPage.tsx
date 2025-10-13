@@ -194,159 +194,168 @@ export default function AIInterviewPage() {
   // Show modern type selection screen when no type is provided
   if (!type) {
     return (
-      <div ref={pageRef} className="min-h-screen bg-white py-8">
+      <div ref={pageRef} className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div ref={headerRef} className="text-center mb-6 sm:mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-black rounded-2xl mb-4 sm:mb-6">
-              <Brain className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+          <div ref={headerRef} className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-violet-600 to-purple-600 rounded-3xl mb-6 shadow-2xl">
+              <Brain className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-medium text-black mb-3 sm:mb-4">
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent mb-4">
               AI Interview Practice
             </h1>
-            <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto leading-relaxed px-4">
+            <p className="text-lg text-gray-700 max-w-3xl mx-auto leading-relaxed px-4 font-medium">
               Experience next-generation interview preparation with AI-powered feedback, 
               real-time analysis, and personalized coaching to excel in your career journey.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 sm:mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {/* HR Interview */}
             <div 
               ref={el => { if (el) cardsRef.current[0] = el }}
-              className="group relative bg-white rounded-xl p-4 sm:p-5 border border-gray-200 hover:border-gray-300 transition-all duration-300 cursor-pointer"
+              className="group relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden"
               onClick={() => navigate('/ai-interview/hr')}
             >
-              <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-xl mx-auto mb-3 sm:mb-4">
-                <User className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-center w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl mx-auto mb-4 shadow-lg">
+                  <User className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3 text-center">HR Interview</h3>
+                <p className="text-blue-100 mb-5 text-center leading-relaxed text-sm">
+                  Master behavioral questions, cultural fit assessment, and professional communication with AI-powered insights.
+                </p>
+                
+                <div className="space-y-2 mb-5">
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Behavioral question analysis</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Communication skills evaluation</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Professional presence coaching</span>
+                  </div>
+                </div>
+                
+                <button className="w-full bg-white text-blue-600 py-3.5 px-4 rounded-xl font-bold transition-all duration-200 hover:bg-blue-50 shadow-lg">
+                  Start HR Practice
+                </button>
               </div>
-              <h3 className="text-base sm:text-lg font-medium text-black mb-2 sm:mb-3 text-center">HR Interview</h3>
-              <p className="text-gray-600 mb-3 sm:mb-4 text-center leading-relaxed text-xs sm:text-sm">
-                Master behavioral questions, cultural fit assessment, and professional communication with AI-powered insights.
-              </p>
-              
-              <div className="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4">
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Behavioral question analysis</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Communication skills evaluation</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Professional presence coaching</span>
-                </div>
-              </div>
-              
-              <button className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 hover:bg-gray-800 text-sm">
-                Start HR Practice
-              </button>
             </div>
 
             {/* Technical Interview */}
             <div 
               ref={el => { if (el) cardsRef.current[1] = el }}
-              className="group relative bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-300 transition-all duration-300 cursor-pointer"
+              className="group relative bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden"
               onClick={() => navigate('/ai-interview/technical')}
             >
-              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl mx-auto mb-4">
-                <Settings className="w-6 h-6 text-gray-600" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-center w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl mx-auto mb-4 shadow-lg">
+                  <Settings className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3 text-center">Technical Interview</h3>
+                <p className="text-emerald-100 mb-5 text-center leading-relaxed text-sm">
+                  Sharpen your technical expertise with programming concepts, system design, and problem-solving challenges.
+                </p>
+                
+                <div className="space-y-2 mb-5">
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Programming fundamentals</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>System architecture design</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Technical problem solving</span>
+                  </div>
+                </div>
+                
+                <button className="w-full bg-white text-emerald-600 py-3.5 px-4 rounded-xl font-bold transition-all duration-200 hover:bg-emerald-50 shadow-lg">
+                  Start Technical Practice
+                </button>
               </div>
-              <h3 className="text-lg font-medium text-black mb-3 text-center">Technical Interview</h3>
-              <p className="text-gray-600 mb-4 text-center leading-relaxed text-sm">
-                Sharpen your technical expertise with programming concepts, system design, and problem-solving challenges.
-              </p>
-              
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Programming fundamentals</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>System architecture design</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Technical problem solving</span>
-                </div>
-              </div>
-              
-              <button className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 hover:bg-gray-800 text-sm">
-                Start Technical Practice
-              </button>
             </div>
 
             {/* Aptitude Interview */}
             <div 
               ref={el => { if (el) cardsRef.current[2] = el }}
-              className="group relative bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-300 transition-all duration-300 cursor-pointer"
+              className="group relative bg-gradient-to-br from-orange-500 to-amber-600 rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer overflow-hidden"
               onClick={() => navigate('/ai-interview/aptitude')}
             >
-              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl mx-auto mb-4">
-                <Target className="w-6 h-6 text-gray-600" />
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-center w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl mx-auto mb-4 shadow-lg">
+                  <Target className="w-7 h-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3 text-center">Aptitude Assessment</h3>
+                <p className="text-orange-100 mb-5 text-center leading-relaxed text-sm">
+                  Enhance logical reasoning, analytical thinking, and quantitative problem-solving abilities with structured practice.
+                </p>
+                
+                <div className="space-y-2 mb-5">
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Logical reasoning patterns</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Analytical thinking skills</span>
+                  </div>
+                  <div className="flex items-center text-sm text-white/90">
+                    <div className="w-1.5 h-1.5 bg-white rounded-full mr-2"></div>
+                    <span>Quantitative problem solving</span>
+                  </div>
+                </div>
+                
+                <button className="w-full bg-white text-orange-600 py-3.5 px-4 rounded-xl font-bold transition-all duration-200 hover:bg-orange-50 shadow-lg">
+                  Start Aptitude Test
+                </button>
               </div>
-              <h3 className="text-lg font-medium text-black mb-3 text-center">Aptitude Assessment</h3>
-              <p className="text-gray-600 mb-4 text-center leading-relaxed text-sm">
-                Enhance logical reasoning, analytical thinking, and quantitative problem-solving abilities with structured practice.
-              </p>
-              
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Logical reasoning patterns</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Analytical thinking skills</span>
-                </div>
-                <div className="flex items-center text-xs text-gray-600">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full mr-2"></div>
-                  <span>Quantitative problem solving</span>
-                </div>
-              </div>
-              
-              <button className="w-full bg-black text-white py-3 px-4 rounded-xl font-medium transition-all duration-200 hover:bg-gray-800 text-sm">
-                Start Aptitude Test
-              </button>
             </div>
           </div>
 
           {/* Features Section */}
-          <div className="bg-white rounded-xl p-6 border border-gray-200 mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <Sparkles className="w-5 h-5 text-gray-600 mr-2" />
-              <h3 className="text-lg font-medium text-black">AI-Powered Interview Experience</h3>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-purple-100 shadow-lg mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <Sparkles className="w-6 h-6 text-purple-600 mr-2" />
+              <h3 className="text-2xl font-bold text-gray-900">AI-Powered Interview Experience</h3>
             </div>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Brain className="w-5 h-5 text-gray-600" />
+                <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                  <Brain className="w-7 h-7 text-white" />
                 </div>
-                <p className="font-medium text-black mb-1 text-sm">Smart Analysis</p>
-                <p className="text-xs text-gray-600">Real-time AI evaluation</p>
+                <p className="font-bold text-gray-900 mb-1">Smart Analysis</p>
+                <p className="text-sm text-gray-600">Real-time AI evaluation</p>
               </div>
               <div className="text-center">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Target className="w-5 h-5 text-gray-600" />
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                  <Target className="w-7 h-7 text-white" />
                 </div>
-                <p className="font-medium text-black mb-1 text-sm">Precision Scoring</p>
-                <p className="text-xs text-gray-600">Multi-criteria assessment</p>
+                <p className="font-bold text-gray-900 mb-1">Precision Scoring</p>
+                <p className="text-sm text-gray-600">Multi-criteria assessment</p>
               </div>
               <div className="text-center">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Sparkles className="w-5 h-5 text-gray-600" />
+                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                  <Sparkles className="w-7 h-7 text-white" />
                 </div>
-                <p className="font-medium text-black mb-1 text-sm">Personalized Feedback</p>
-                <p className="text-xs text-gray-600">Tailored improvement insights</p>
+                <p className="font-bold text-gray-900 mb-1">Personalized Feedback</p>
+                <p className="text-sm text-gray-600">Tailored improvement insights</p>
               </div>
               <div className="text-center">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                  <Settings className="w-5 h-5 text-gray-600" />
+                <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                  <Settings className="w-7 h-7 text-white" />
                 </div>
-                <p className="font-medium text-black mb-1 text-sm">Advanced Tools</p>
-                <p className="text-xs text-gray-600">Voice & speech analysis</p>
+                <p className="font-bold text-gray-900 mb-1">Advanced Tools</p>
+                <p className="text-sm text-gray-600">Voice & speech analysis</p>
               </div>
             </div>
           </div>
@@ -354,9 +363,9 @@ export default function AIInterviewPage() {
           <div className="text-center">
             <button
               onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center text-gray-600 hover:text-black font-medium transition-colors group text-sm"
+              className="inline-flex items-center text-purple-600 hover:text-purple-700 font-semibold transition-colors group"
             >
-              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+              <ArrowLeft className="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform" />
               Back to Dashboard
             </button>
           </div>

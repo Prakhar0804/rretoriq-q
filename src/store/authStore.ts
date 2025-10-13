@@ -24,6 +24,8 @@ export interface User {
   createdAt: string
   profileCompleted?: boolean
   isNewUser?: boolean
+  admin?: boolean // Custom claim for institutional admins
+  institutionId?: string // Institution the user belongs to (for students)
 }
 
 export interface LoginCredentials {
@@ -72,6 +74,10 @@ const convertFirebaseUser = async (firebaseUser: FirebaseUser, isNewUser: boolea
   const userProfile = await userProfileService.getUserProfile(firebaseUser.uid)
   const profileCompleted = userProfile ? checkProfileCompleteness(userProfile) : false
   
+  // Get custom claims (admin status) from ID token
+  const idTokenResult = await firebaseUser.getIdTokenResult()
+  const isAdmin = idTokenResult.claims.admin === true
+  
   if (userDoc.exists()) {
     const userData = userDoc.data()
     return {
@@ -84,7 +90,9 @@ const convertFirebaseUser = async (firebaseUser: FirebaseUser, isNewUser: boolea
       emailVerified: firebaseUser.emailVerified,
       createdAt: userData.createdAt || new Date().toISOString(),
       profileCompleted,
-      isNewUser
+      isNewUser,
+      admin: isAdmin,
+      institutionId: userData.institutionId
     }
   }
 
@@ -100,7 +108,8 @@ const convertFirebaseUser = async (firebaseUser: FirebaseUser, isNewUser: boolea
     emailVerified: firebaseUser.emailVerified,
     createdAt: new Date().toISOString(),
     profileCompleted,
-    isNewUser
+    isNewUser,
+    admin: isAdmin
   }
 }
 

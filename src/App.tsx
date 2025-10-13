@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { HelmetProvider } from 'react-helmet-async'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import ScrollToTop from './components/ScrollToTop'
 import Home from './pages/Home'
 import Demo from './pages/Demo'
@@ -13,7 +14,7 @@ import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import Dashboard from './pages/dashboard/Dashboardnew'
 import IELTSPractice from './pages/ielts/IELTSPractice'
-
+import Resources from './pages/Resources'
 import Profile from './pages/profile/Profile'
 import Progress from './pages/progress/Progress'
 import Pricing from './pages/pricing/Pricing'
@@ -27,6 +28,8 @@ import FAQ from './pages/FAQ'
 import AboutUs from './pages/AboutUs'
 import Help from './pages/Help'
 import PlanUpgrade from './pages/PlanUpgrade'
+import InstitutionAdminDashboard from './pages/admin/InstitutionAdminDashboard'
+import StudentsDetails from './pages/admin/StudentsDetails'
 import { MessageCircle, Shield, FileText } from 'lucide-react'
 
 // Create a client for React Query
@@ -91,9 +94,21 @@ function App() {
               <Dashboard />
             </ProtectedRoute>
           } />
+          
+          {/* Admin Portal Routes (requires admin custom claim) */}
+          <Route element={<AdminRoute />}>
+            <Route path="/admin/dashboard" element={<InstitutionAdminDashboard />} />
+            <Route path="/admin/students" element={<StudentsDetails />} />
+          </Route>
+          
           <Route path="/ielts" element={
             <ProtectedRoute>
               <IELTSPractice />
+            </ProtectedRoute>
+          } />
+          <Route path="/resources" element={
+            <ProtectedRoute>
+              <Resources />
             </ProtectedRoute>
           } />
           <Route path="/interview" element={
@@ -137,22 +152,10 @@ function App() {
             </ProtectedRoute>
           } />
           
-          {/* Support Pages (protected routes for authenticated users) */}
-          <Route path="/faq" element={
-            <ProtectedRoute>
-              <FAQ />
-            </ProtectedRoute>
-          } />
-          <Route path="/help" element={
-            <ProtectedRoute>
-              <Help />
-            </ProtectedRoute>
-          } />
-          <Route path="/about" element={
-            <ProtectedRoute>
-              <AboutUs />
-            </ProtectedRoute>
-          } />
+          {/* Support Pages (publicly accessible pre-login) */}
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/about" element={<AboutUs />} />
           
           {/* Coming Soon Pages (remaining) */}
           <Route path="/contact" element={

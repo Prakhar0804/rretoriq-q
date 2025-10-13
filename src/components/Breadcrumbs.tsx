@@ -17,7 +17,7 @@ const Breadcrumbs: React.FC = () => {
     'login': 'Sign In',
     'register': 'Sign Up',
     'dashboard': 'Dashboard',
-    'ielts': 'IELTS Practice',
+    'ielts': "Let's Communicate",
     'interview': 'Interview Practice',
     'profile': 'Profile',
     'progress': 'Progress',

@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuthStore } from '../../store/authStore'
 import { userProfileService, type UserProfile, type UserStats } from '../../services/userProfileService'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { storage } from '../../lib/firebase'
+import { parseResumeWithGemini } from '../../services/resumeParsingService'
 import { 
   User, 
   Mail, 
@@ -21,7 +24,10 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  Upload,
+  FileText,
+  Sparkles
 } from 'lucide-react'
 
 const profileSchema = z.object({
@@ -55,6 +61,12 @@ export default function Profile() {
     memberSince: new Date(),
     lastActivity: null
   })
+  const [photoURL, setPhotoURL] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [isParsingResume, setIsParsingResume] = useState(false)
+  const [resumeParseSuccess, setResumeParseSuccess] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const resumeInputRef = useRef<HTMLInputElement>(null)
   
   // Preferences state
   const [preferences, setPreferences] = useState({
@@ -128,6 +140,13 @@ export default function Profile() {
         }
         
         setUserStats(stats)
+        
+        // Set photo URL if available
+        if (profile?.photoURL) {
+          setPhotoURL(profile.photoURL)
+        } else if (user.photoURL) {
+          setPhotoURL(user.photoURL)
+        }
         
         // Update form with profile data
         if (profile || user) {
@@ -232,6 +251,80 @@ export default function Profile() {
     }
   }
 
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file')
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB')
+      return
+    }
+
+    setUploadingPhoto(true)
+    try {
+      // Upload to Firebase Storage
+      const storageRef = ref(storage, `profile-photos/${user.id}/${Date.now()}_${file.name}`)
+      await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(storageRef)
+
+      // Update user profile with photo URL
+      await userProfileService.updateUserProfile(user.id, {
+        photoURL: downloadURL
+      })
+
+      setPhotoURL(downloadURL)
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to upload photo:', error)
+      alert('Failed to upload photo. Please try again.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
+    setIsParsingResume(true)
+    setResumeParseSuccess(false)
+    
+    try {
+      const parsedData = await parseResumeWithGemini(file)
+      
+      // Auto-populate form fields using setValue
+      if (parsedData.firstName) reset((current) => ({ ...current, firstName: parsedData.firstName! }))
+      if (parsedData.lastName) reset((current) => ({ ...current, lastName: parsedData.lastName! }))
+      if (parsedData.phone) reset((current) => ({ ...current, phone: parsedData.phone! }))
+      if (parsedData.location) reset((current) => ({ ...current, location: parsedData.location! }))
+      if (parsedData.occupation) reset((current) => ({ ...current, occupation: parsedData.occupation! }))
+      if (parsedData.company) reset((current) => ({ ...current, company: parsedData.company! }))
+      if (parsedData.education) reset((current) => ({ ...current, education: parsedData.education! }))
+      if (parsedData.languages && Array.isArray(parsedData.languages)) {
+        reset((current) => ({ ...current, languages: parsedData.languages!.join(', ') }))
+      }
+      if (parsedData.bio) reset((current) => ({ ...current, bio: parsedData.bio! }))
+      
+      setResumeParseSuccess(true)
+      setTimeout(() => setResumeParseSuccess(false), 5000)
+    } catch (error) {
+      console.error('Failed to parse resume:', error)
+      alert(error instanceof Error ? error.message : 'Failed to parse resume. Please try again.')
+    } finally {
+      setIsParsingResume(false)
+      // Reset file input
+      if (event.target) event.target.value = ''
+    }
+  }
+
   const tabs = [
     { id: 'personal', label: 'Personal Info', icon: User },
     { id: 'preferences', label: 'Preferences', icon: Settings },
@@ -241,61 +334,90 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 text-sm">Loading profile...</p>
+          <Loader2 className="w-8 h-8 text-purple-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-700 text-sm font-medium">Loading profile...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {/* Header */}
-        <div className="border border-gray-200 rounded-xl p-10 mb-8">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-10 mb-8 shadow-xl text-white">
           <div className="flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-8">
             <div className="relative">
-              <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
-                <User className="w-10 h-10 text-gray-600" />
-              </div>
-              <button className="absolute -bottom-1 -right-1 bg-gray-600 text-white p-1.5 rounded-full hover:bg-gray-700 transition-colors">
-                <Camera className="w-3 h-3" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                className="hidden"
+              />
+              {photoURL ? (
+                <img 
+                  src={photoURL} 
+                  alt="Profile" 
+                  className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-4 border-white shadow-lg">
+                  <User className="w-10 h-10 text-white" />
+                </div>
+              )}
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+                className="absolute -bottom-1 -right-1 bg-white text-indigo-600 p-1.5 rounded-full hover:bg-indigo-50 transition-colors disabled:opacity-50 shadow-lg"
+              >
+                {uploadingPhoto ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Camera className="w-3 h-3" />
+                )}
               </button>
             </div>
             
             <div className="text-center md:text-left flex-1">
-              <h1 className="text-2xl font-light text-gray-900 mb-2">
+              <h1 className="text-2xl font-bold text-white mb-2">
                 {loading ? 'Loading...' : 
                  (userProfile?.displayName || user?.displayName || 
                   `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim() || 
                   user?.email?.split('@')[0] || 'User')}
               </h1>
-              <p className="text-gray-600 mb-1">{user?.email}</p>
-              <p className="text-sm text-gray-500">
+              <p className="text-white/90 mb-1">{user?.email}</p>
+              {userProfile?.institutionName && (
+                <p className="text-sm text-white/90 mb-1 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4" />
+                  <span>{userProfile.institutionName}</span>
+                </p>
+              )}
+              <p className="text-sm text-white/70">
                 {loading ? 'Loading...' : userProfileService.formatMemberSince(userStats.memberSince)}
               </p>
             </div>
 
             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-6">
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <p className="text-xl font-light text-gray-900">
+              <div className="text-center p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                <p className="text-xl font-bold text-white">
                   {loading ? '...' : userStats.totalSessions}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">Sessions</p>
+                <p className="text-xs text-white/80 mt-1">Sessions</p>
               </div>
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <p className="text-xl font-light text-gray-900">
+              <div className="text-center p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                <p className="text-xl font-bold text-white">
                   {loading ? '...' : userStats.averageScore > 0 ? userStats.averageScore.toFixed(1) : '0.0'}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">Avg Score</p>
+                <p className="text-xs text-white/80 mt-1">Avg Score</p>
               </div>
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <p className="text-xl font-light text-gray-900">
+              <div className="text-center p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+                <p className="text-xl font-bold text-white">
                   {loading ? '...' : userProfileService.formatPracticeTime(userStats.totalPracticeTime)}
                 </p>
-                <p className="text-xs text-gray-600 mt-1">Practice Time</p>
+                <p className="text-xs text-white/80 mt-1">Practice Time</p>
               </div>
             </div>
           </div>
@@ -304,7 +426,7 @@ export default function Profile() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar */}
           <div className="lg:w-1/4">
-            <div className="border border-gray-200 rounded-xl p-6">
+            <div className="bg-white/80 backdrop-blur-sm border border-purple-100 rounded-xl p-6 shadow-lg">
               <nav className="space-y-1">
                 {tabs.map((tab) => {
                   const IconComponent = tab.icon
@@ -312,10 +434,10 @@ export default function Profile() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all ${
                         activeTab === tab.id
-                          ? 'bg-gray-50 text-gray-900'
-                          : 'text-gray-600 hover:bg-gray-25'
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                          : 'text-gray-700 hover:bg-purple-50'
                       }`}
                     >
                       <IconComponent className="w-4 h-4" />
@@ -329,17 +451,71 @@ export default function Profile() {
 
           {/* Main Content */}
           <div className="lg:w-3/4">
-            <div className="border border-gray-200 rounded-xl p-10">
+            <div className="bg-white/80 backdrop-blur-sm border border-purple-100 rounded-xl p-10 shadow-lg">
               {activeTab === 'personal' && (
                 <div>
                   <div className="flex items-center justify-between mb-8">
-                    <h2 className="text-lg font-medium text-gray-900">Personal Information</h2>
+                    <h2 className="text-lg font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Personal Information</h2>
                     {saveSuccess && (
-                      <div className="flex items-center space-x-2 text-gray-600">
+                      <div className="flex items-center space-x-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">
                         <CheckCircle className="w-4 h-4" />
                         <span className="text-sm font-medium">Profile updated successfully!</span>
                       </div>
                     )}
+                  </div>
+
+                  {/* AI Resume Upload Banner */}
+                  <div className="mb-8 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                            <Sparkles className="w-6 h-6 text-white" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-base font-semibold text-gray-900 mb-1">
+                            Auto-fill from Resume
+                          </h3>
+                          <p className="text-sm text-gray-600 mb-3">
+                            Upload your resume and let AI automatically populate your profile fields
+                          </p>
+                          <input
+                            ref={resumeInputRef}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt"
+                            onChange={handleResumeUpload}
+                            disabled={isParsingResume}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => resumeInputRef.current?.click()}
+                            disabled={isParsingResume}
+                            className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {isParsingResume ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>Analyzing Resume...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4" />
+                                <span>Upload Resume</span>
+                              </>
+                            )}
+                          </button>
+                          {resumeParseSuccess && (
+                            <div className="mt-3 flex items-center space-x-2 text-emerald-600">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="text-sm font-medium">Resume parsed successfully! Fields have been auto-filled.</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <FileText className="w-8 h-8 text-purple-300" />
+                    </div>
                   </div>
 
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

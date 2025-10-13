@@ -9,61 +9,21 @@ import {
   CheckCircle,
   XCircle,
   PenTool,
-  MessageSquare,
-  Headphones
+  MessageSquare
 } from 'lucide-react'
-
-interface Question {
-  id: number
-  type: 'speaking' | 'listening' | 'reading' | 'writing'
-  part: number
-  question: string
-  context?: string
-  options?: string[]
-  audioUrl?: string
-  timeLimit: number
-  instructions: string
-}
-
-const mockQuestions: Question[] = [
-  {
-    id: 1,
-    type: 'speaking',
-    part: 1,
-    question: "What is your full name?",
-    timeLimit: 30,
-    instructions: "Introduce yourself clearly and speak for about 10-20 seconds."
-  },
-  {
-    id: 2,
-    type: 'speaking',
-    part: 1,
-    question: "Where are you from?",
-    timeLimit: 45,
-    instructions: "Describe your hometown or country briefly."
-  },
-  {
-    id: 3,
-    type: 'speaking',
-    part: 2,
-    question: "Describe a memorable trip you have taken.",
-    context: "You should say:\n• Where you went\n• When you went there\n• Who you went with\n• And explain why it was memorable",
-    timeLimit: 120,
-    instructions: "You have 1 minute to prepare and then speak for 1-2 minutes."
-  }
-]
+import { speakingQuestions, type CommunicationQuestion } from '../../data/communicationQuestions'
 
 export default function IELTSPractice() {
   const navigate = useNavigate()
-  const [selectedType, setSelectedType] = useState<'speaking' | 'listening' | 'reading' | 'writing'>('speaking')
-  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
+  const [selectedType, setSelectedType] = useState<'speaking' | 'reading' | 'writing'>('speaking')
+  const [currentQuestion, setCurrentQuestion] = useState<CommunicationQuestion | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
-  const [isPreparing, setIsPreparing] = useState(false)
-  const [preparationTime, setPreparationTime] = useState(0)
-  const [responses, setResponses] = useState<{ [key: number]: string }>({})
+  const [responses, setResponses] = useState<{ [key: string]: string }>({})
   const [sessionStarted, setSessionStarted] = useState(false)
   const [sessionComplete, setSessionComplete] = useState(false)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [selectedQuestions, setSelectedQuestions] = useState<CommunicationQuestion[]>([])
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
@@ -75,14 +35,6 @@ export default function IELTSPractice() {
       description: 'Practice speaking skills with real-time recording',
       color: 'bg-blue-500',
       hoverColor: 'hover:bg-blue-600'
-    },
-    {
-      type: 'listening' as const,
-      title: 'Listening',
-      icon: <Headphones className="w-6 h-6" />,
-      description: 'Improve listening comprehension with audio exercises',
-      color: 'bg-green-500',
-      hoverColor: 'hover:bg-green-600'
     },
     {
       type: 'reading' as const,
@@ -115,33 +67,19 @@ export default function IELTSPractice() {
     return () => clearInterval(interval)
   }, [isRecording, recordingTime, currentQuestion])
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isPreparing && preparationTime > 0) {
-      interval = setInterval(() => {
-        setPreparationTime(prev => {
-          if (prev <= 1) {
-            setIsPreparing(false)
-            return 0
-          }
-          return prev - 1
-        })
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [isPreparing, preparationTime])
-
-  const startSession = (type: 'speaking' | 'listening' | 'reading' | 'writing') => {
+  const startSession = (type: 'speaking' | 'reading' | 'writing') => {
     setSelectedType(type)
     setSessionStarted(true)
-    const questions = mockQuestions.filter(q => q.type === type)
-    if (questions.length > 0) {
-      setCurrentQuestion(questions[0])
-      if (type === 'speaking' && questions[0].part === 2) {
-        setIsPreparing(true)
-        setPreparationTime(60)
-      }
+    
+    // Select 5 random questions from the available pool
+    if (type === 'speaking') {
+      const shuffled = [...speakingQuestions].sort(() => 0.5 - Math.random())
+      const selected = shuffled.slice(0, 5)
+      setSelectedQuestions(selected)
+      setCurrentQuestion(selected[0])
+      setCurrentQuestionIndex(0)
     }
+    // For reading and writing, we'll add logic when questions are available
   }
 
   const startRecording = async () => {
@@ -181,20 +119,11 @@ export default function IELTSPractice() {
   }
 
   const nextQuestion = () => {
-    const questions = mockQuestions.filter(q => q.type === selectedType)
-    const currentIndex = questions.findIndex(q => q.id === currentQuestion?.id)
-    
-    if (currentIndex < questions.length - 1) {
-      const nextQ = questions[currentIndex + 1]
-      setCurrentQuestion(nextQ)
+    if (currentQuestionIndex < selectedQuestions.length - 1) {
+      const nextIndex = currentQuestionIndex + 1
+      setCurrentQuestionIndex(nextIndex)
+      setCurrentQuestion(selectedQuestions[nextIndex])
       setRecordingTime(0)
-      setIsPreparing(false)
-      setPreparationTime(0)
-      
-      if (selectedType === 'speaking' && nextQ.part === 2) {
-        setIsPreparing(true)
-        setPreparationTime(60)
-      }
     } else {
       setSessionComplete(true)
     }
@@ -206,9 +135,9 @@ export default function IELTSPractice() {
     setCurrentQuestion(null)
     setIsRecording(false)
     setRecordingTime(0)
-    setIsPreparing(false)
-    setPreparationTime(0)
     setResponses({})
+    setSelectedQuestions([])
+    setCurrentQuestionIndex(0)
   }
 
   const formatTime = (seconds: number) => {
@@ -224,7 +153,7 @@ export default function IELTSPractice() {
           <div className="text-center mb-12">
             <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-6" />
             <h1 className="text-2xl font-light text-gray-900 mb-3">Session Complete!</h1>
-            <p className="text-gray-600">Great job completing your IELTS {selectedType} practice session.</p>
+            <p className="text-gray-600">Great job completing your {selectedType} practice session.</p>
           </div>
 
           <div className="border border-gray-200 rounded-xl p-10 mb-8">
@@ -288,7 +217,7 @@ export default function IELTSPractice() {
           <div className="border border-gray-200 rounded-xl p-8 mb-8">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-xl font-medium text-gray-900">
-                IELTS {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} - Part {currentQuestion.part}
+                Let's Communicate - {currentQuestion.difficulty} Level
               </h1>
               <button
                 onClick={resetSession}
@@ -303,6 +232,10 @@ export default function IELTSPractice() {
                 <Clock className="w-4 h-4" />
                 <span>Time Limit: {formatTime(currentQuestion.timeLimit)}</span>
               </div>
+              <div className="flex items-center space-x-2">
+                <BookOpen className="w-4 h-4" />
+                <span>Question {currentQuestionIndex + 1} of {selectedQuestions.length}</span>
+              </div>
               {isRecording && (
                 <div className="flex items-center space-x-2 text-gray-900">
                   <div className="w-2 h-2 bg-gray-900 rounded-full animate-pulse" />
@@ -311,15 +244,6 @@ export default function IELTSPractice() {
               )}
             </div>
           </div>
-
-          {/* Preparation Phase */}
-          {isPreparing && (
-            <div className="border border-gray-200 rounded-xl p-10 mb-8 text-center">
-              <h2 className="text-lg font-medium text-gray-900 mb-6">Preparation Time</h2>
-              <div className="text-4xl font-light text-gray-900 mb-6">{formatTime(preparationTime)}</div>
-              <p className="text-sm text-gray-600">Use this time to prepare your response. You can take notes if needed.</p>
-            </div>
-          )}
 
           {/* Question */}
           <div className="border border-gray-200 rounded-xl p-8 mb-8">
@@ -332,15 +256,20 @@ export default function IELTSPractice() {
               <h2 className="text-lg font-medium text-gray-900 mb-4">Question</h2>
               <p className="text-base text-gray-800 mb-4 leading-relaxed">{currentQuestion.question}</p>
               
-              {currentQuestion.context && (
+              {currentQuestion.keyPoints && currentQuestion.keyPoints.length > 0 && (
                 <div className="bg-gray-50 border-l-2 border-gray-200 p-4 rounded">
-                  <pre className="text-gray-700 whitespace-pre-wrap text-sm">{currentQuestion.context}</pre>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Key Points to Consider:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                    {currentQuestion.keyPoints.map((point, idx) => (
+                      <li key={idx}>{point}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
 
             {/* Recording Controls */}
-            {selectedType === 'speaking' && !isPreparing && (
+            {selectedType === 'speaking' && (
               <div className="flex flex-col items-center space-y-6">
                 <div className="flex items-center space-x-4">
                   {!isRecording ? (
@@ -409,7 +338,7 @@ export default function IELTSPractice() {
             
             <button
               onClick={nextQuestion}
-              disabled={!responses[currentQuestion.id] && selectedType !== 'listening'}
+              disabled={!responses[currentQuestion.id]}
               className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
             >
               Next Question
@@ -422,51 +351,54 @@ export default function IELTSPractice() {
 
   // Skill Selection Screen
   return (
-    <div className="min-h-screen bg-white py-8">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-xl sm:text-2xl font-medium text-gray-900 mb-3">IELTS Practice</h1>
-          <p className="text-sm sm:text-base text-gray-600 max-w-2xl mx-auto px-4">
+          <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent mb-3">Let's Communicate</h1>
+          <p className="text-sm sm:text-base text-gray-700 max-w-2xl mx-auto px-4 font-medium">
             Choose a skill to practice. Our AI-powered system will provide personalized feedback and scoring.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {skillTypes.map((skill) => (
             <div
               key={skill.type}
-              className="border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 transition-colors cursor-pointer group"
+              className={`bg-gradient-to-br ${
+                skill.type === 'speaking' 
+                  ? 'from-blue-500 to-indigo-600' 
+                  : skill.type === 'reading'
+                  ? 'from-purple-500 to-violet-600'
+                  : 'from-orange-500 to-amber-600'
+              } rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 cursor-pointer group relative overflow-hidden`}
               onClick={() => startSession(skill.type)}
             >
-              <div className="p-4 sm:p-6">
-                <div className="flex items-center space-x-3 sm:space-x-4 mb-4">
-                  <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <div className="text-gray-600">
-                      {skill.icon}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1">{skill.title}</h3>
-                    <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">{skill.description}</p>
+              <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                  <div className="text-white">
+                    {skill.icon}
                   </div>
                 </div>
+                <h3 className="text-xl font-bold text-white mb-3">{skill.title}</h3>
+                <p className="text-white/90 mb-5 leading-relaxed text-sm">{skill.description}</p>
                 
-                <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs text-gray-500 mb-4">
+                <div className="grid grid-cols-3 gap-3 text-xs mb-5">
                   <div className="text-center">
-                    <div className="font-medium text-gray-900 text-xs sm:text-sm">3-4</div>
-                    <div className="text-xs">Questions</div>
+                    <div className="font-bold text-white text-sm">3-4</div>
+                    <div className="text-white/80">Questions</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium text-gray-900 text-xs sm:text-sm">15-20 min</div>
-                    <div className="text-xs">Duration</div>
+                    <div className="font-bold text-white text-sm">15-20 min</div>
+                    <div className="text-white/80">Duration</div>
                   </div>
                   <div className="text-center">
-                    <div className="font-medium text-gray-900 text-xs sm:text-sm">Intermediate</div>
-                    <div className="text-xs">Difficulty</div>
+                    <div className="font-bold text-white text-sm">Intermediate</div>
+                    <div className="text-white/80">Difficulty</div>
                   </div>
                 </div>
 
-                <button className="w-full bg-black text-white py-2.5 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium text-xs sm:text-sm">
+                <button className="w-full bg-white text-gray-900 py-3 px-4 rounded-xl hover:bg-white/90 transition-colors font-bold shadow-lg">
                   Start Practice
                 </button>
               </div>
@@ -474,31 +406,31 @@ export default function IELTSPractice() {
           ))}
         </div>
 
-        <div className="border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-6 text-center">How It Works</h2>
-          <div className="grid grid-cols-3 gap-6">
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-teal-100 shadow-lg">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">How It Works</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Play className="w-5 h-5 text-gray-600" />
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <Play className="w-7 h-7 text-white" />
               </div>
-              <h3 className="font-medium text-gray-900 mb-2 text-sm">1. Select & Start</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">Choose your skill and begin the practice session with real IELTS-style questions.</p>
+              <h3 className="font-bold text-gray-900 mb-2">1. Select & Start</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">Choose your skill and begin the practice session with real IELTS-style questions.</p>
             </div>
             
             <div className="text-center">
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <MessageSquare className="w-5 h-5 text-gray-600" />
+              <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <MessageSquare className="w-7 h-7 text-white" />
               </div>
-              <h3 className="font-medium text-gray-900 mb-2 text-sm">2. Practice & Record</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">Answer questions with our recording system and receive real-time guidance.</p>
+              <h3 className="font-bold text-gray-900 mb-2">2. Practice & Record</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">Answer questions with our recording system and receive real-time guidance.</p>
             </div>
             
             <div className="text-center">
-              <div className="w-10 h-10 bg-gray-50 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <CheckCircle className="w-5 h-5 text-gray-600" />
+              <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <CheckCircle className="w-7 h-7 text-white" />
               </div>
-              <h3 className="font-medium text-gray-900 mb-2 text-sm">3. Get Feedback</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">Receive detailed feedback and scoring to improve your performance.</p>
+              <h3 className="font-bold text-gray-900 mb-2">3. Get Feedback</h3>
+              <p className="text-sm text-gray-600 leading-relaxed">Receive detailed feedback and scoring to improve your performance.</p>
             </div>
           </div>
         </div>

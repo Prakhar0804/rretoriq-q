@@ -21,7 +21,10 @@ import {
   Clock,
 } from 'lucide-react'
 import { speechToTextService, type TranscriptionResult } from '../services/speechToTextService'
-import { openAIAnalysisService, type AnswerAnalysis, type InterviewQuestion } from '../services/openAIAnalysisService'
+import { geminiAnalysisService, type AnswerAnalysis, type InterviewQuestion } from '../services/geminiAnalysisService'
+// Alternative: import { openAIAnalysisService, type AnswerAnalysis, type InterviewQuestion } from '../services/openAIAnalysisService'
+
+// AI provider selection is available via env when needed; currently we import services directly where used.
 
 interface AudioRecorderProps {
   question: InterviewQuestion
@@ -305,8 +308,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
       console.log('✅ Transcription successful:', transcription.transcript)
 
-      // Step 2: Analyze transcription with OpenAI
-      const analysis = await openAIAnalysisService.analyzeAnswer({
+      // Step 2: Analyze transcription with AI (Gemini or OpenAI based on env)
+      const analysis = await geminiAnalysisService.analyzeAnswer({
         transcript: transcription.transcript,
         question: question,
         audioDuration: duration,

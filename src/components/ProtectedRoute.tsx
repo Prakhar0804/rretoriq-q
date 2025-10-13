@@ -61,11 +61,21 @@ const ProtectedRoute = ({
       return <Navigate to="/complete-profile" replace />
     }
     
+    // Redirect authenticated users based on their role
+    if (user?.admin) {
+      return <Navigate to="/admin/dashboard" replace />
+    }
+    
     return <Navigate to="/dashboard" replace />
   }
 
   // Allow access to profile completion page
   if (location.pathname === '/complete-profile') {
+    return <>{children}</>
+  }
+
+  // Allow admin users to bypass profile completion to access admin dashboard
+  if (user?.admin && location.pathname.startsWith('/admin')) {
     return <>{children}</>
   }
 

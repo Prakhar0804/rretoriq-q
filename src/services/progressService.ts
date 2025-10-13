@@ -2,8 +2,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
-  limit,
   getDocs
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -56,19 +54,28 @@ interface RadarData {
 class ProgressService {
   async getProgressStats(userId: string): Promise<ProgressStats> {
     try {
+      // Simplified query - filter by userId only, then filter completed in memory
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        orderBy('createdAt', 'desc')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id,
-        createdAt: doc.data().createdAt?.toDate()
+        startTime: doc.data().startTime?.toDate(),
+        endTime: doc.data().endTime?.toDate()
       }))
+
+      // Filter completed sessions and sort by startTime in memory
+      const sessions = allSessions
+        .filter((s: any) => s.status === 'completed')
+        .sort((a: any, b: any) => {
+          const timeA = a.startTime?.getTime() || 0
+          const timeB = b.startTime?.getTime() || 0
+          return timeB - timeA
+        })
 
       if (sessions.length === 0) {
         return {
@@ -84,8 +91,8 @@ class ProgressService {
 
       // Calculate IELTS scores
       const ieltsScores = sessions
-        .filter((s: any) => s.sessionType === 'IELTS' && s.overallScore)
-        .map((s: any) => s.overallScore)
+        .filter((s: any) => s.sessionType === 'ielts' && s.averageScore)
+        .map((s: any) => s.averageScore)
       
       const overallIeltsScore = ieltsScores.length > 0 
         ? ieltsScores.reduce((a, b) => a + b, 0) / ieltsScores.length 
@@ -93,8 +100,8 @@ class ProgressService {
 
       // Calculate interview scores
       const interviewScores = sessions
-        .filter((s: any) => s.sessionType === 'Interview' && s.overallScore)
-        .map((s: any) => s.overallScore)
+        .filter((s: any) => s.sessionType === 'interview' && s.averageScore)
+        .map((s: any) => s.averageScore)
       
       const interviewAverage = interviewScores.length > 0 
         ? interviewScores.reduce((a, b) => a + b, 0) / interviewScores.length 
@@ -104,7 +111,7 @@ class ProgressService {
       const totalMinutes = sessions.reduce((total: number, session: any) => {
         return total + (session.totalDuration || 0)
       }, 0)
-      const totalPracticeHours = Math.round(totalMinutes / 60)
+      const totalPracticeHours = totalMinutes // Keep in seconds for consistency
 
       // Calculate streak days
       const streakDays = this.calculateStreakDays(sessions)
@@ -114,22 +121,22 @@ class ProgressService {
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
       
       const thisWeekSessions = sessions.filter((s: any) => 
-        s.createdAt && s.createdAt > oneWeekAgo
+        s.startTime && s.startTime > oneWeekAgo
       )
       const thisWeekMinutes = thisWeekSessions.reduce((total: number, session: any) => {
         return total + (session.totalDuration || 0)
       }, 0)
-      const thisWeekHours = Math.round(thisWeekMinutes / 60)
+      const thisWeekHours = thisWeekMinutes // Keep in seconds for consistency
 
       // Calculate improvement trends
       const recentSessions = sessions.slice(0, 5)
       const olderSessions = sessions.slice(5, 10)
       
       const recentAvg = recentSessions.length > 0 
-        ? recentSessions.reduce((sum: number, s: any) => sum + (s.overallScore || 0), 0) / recentSessions.length 
+        ? recentSessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / recentSessions.length 
         : 0
       const olderAvg = olderSessions.length > 0 
-        ? olderSessions.reduce((sum: number, s: any) => sum + (s.overallScore || 0), 0) / olderSessions.length 
+        ? olderSessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / olderSessions.length 
         : 0
       
       const weeklyImprovement = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0
@@ -160,31 +167,39 @@ class ProgressService {
 
   async getRecentSessions(userId: string, limitCount: number = 10): Promise<SessionData[]> {
     try {
+      // Simplified query - fetch all user sessions and filter/sort in memory
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
+      const allSessions = sessionsSnapshot.docs.map(doc => doc.data())
       
-      return sessionsSnapshot.docs.map((doc, index) => {
-        const data = doc.data()
-        const createdAt = data.createdAt?.toDate()
+      // Filter completed, sort by startTime, and limit in memory
+      const completedSessions = allSessions
+        .filter((s: any) => s.status === 'completed')
+        .sort((a: any, b: any) => {
+          const timeA = a.startTime?.toDate()?.getTime() || 0
+          const timeB = b.startTime?.toDate()?.getTime() || 0
+          return timeB - timeA
+        })
+        .slice(0, limitCount)
+      
+      return completedSessions.map((data: any, index) => {
+        const startTime = data.startTime?.toDate()
         const totalDuration = data.totalDuration || 0
         
         // Calculate improvement (simplified - compare with average)
-        const improvement = index < sessionsSnapshot.docs.length - 1 
+        const improvement = index < completedSessions.length - 1 
           ? `+${Math.round(Math.random() * 5 * 10) / 10}` // Placeholder calculation
           : '+0.0'
 
         return {
-          id: doc.id,
-          type: data.sessionType === 'IELTS' ? 'IELTS Speaking' : `${data.sessionType} Interview`,
-          date: createdAt ? createdAt.toLocaleDateString() : new Date().toLocaleDateString(),
-          score: data.overallScore || 0,
+          id: data.id || `session-${index}`,
+          type: data.sessionType === 'ielts' ? 'IELTS Speaking' : `${data.sessionType || 'Interview'} Interview`,
+          date: startTime ? startTime.toLocaleDateString() : new Date().toLocaleDateString(),
+          score: data.averageScore || 0,
           duration: `${Math.floor(totalDuration / 60)}m`,
           improvement
         }
@@ -200,19 +215,28 @@ class ProgressService {
       const sevenDaysAgo = new Date()
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
       
+      // Simplified query - fetch all user sessions and filter in memory
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        where('createdAt', '>=', sevenDaysAgo),
-        orderBy('createdAt', 'asc')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+        startTime: doc.data().startTime?.toDate()
       }))
+
+      // Filter by date and status in memory
+      const sessions = allSessions.filter((session: any) => {
+        return session.status === 'completed' && 
+               session.startTime && 
+               session.startTime >= sevenDaysAgo
+      }).sort((a: any, b: any) => {
+        const timeA = a.startTime?.getTime() || 0
+        const timeB = b.startTime?.getTime() || 0
+        return timeA - timeB
+      })
 
       const weeklyData: WeeklyProgressData[] = []
       
@@ -221,17 +245,17 @@ class ProgressService {
         date.setDate(date.getDate() - i)
         
         const daySessions = sessions.filter((session: any) => {
-          if (!session.createdAt) return false
-          return session.createdAt.toDateString() === date.toDateString()
+          if (!session.startTime) return false
+          return session.startTime.toDateString() === date.toDateString()
         })
 
         const ieltsScores = daySessions
-          .filter((s: any) => s.sessionType === 'IELTS')
-          .map((s: any) => s.overallScore || 0)
+          .filter((s: any) => s.sessionType === 'ielts')
+          .map((s: any) => s.averageScore || 0)
         
         const interviewScores = daySessions
-          .filter((s: any) => s.sessionType === 'Interview')
-          .map((s: any) => s.overallScore || 0)
+          .filter((s: any) => s.sessionType === 'interview')
+          .map((s: any) => s.averageScore || 0)
 
         const ieltsAvg = ieltsScores.length > 0 
           ? ieltsScores.reduce((a, b) => a + b, 0) / ieltsScores.length 
@@ -257,15 +281,19 @@ class ProgressService {
 
   async getSkillsBreakdown(userId: string): Promise<SkillData[]> {
     try {
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
+      const allSessions = sessionsSnapshot.docs.map(doc => doc.data())
       
-      if (sessionsSnapshot.docs.length === 0) {
+      // Filter completed sessions in memory
+      const sessions = allSessions.filter((s: any) => s.status === 'completed')
+      
+      if (sessions.length === 0) {
         return [
           { skill: 'Speaking', current: 0, target: 8.0, improvement: 0 },
           { skill: 'Listening', current: 0, target: 8.0, improvement: 0 },
@@ -276,8 +304,7 @@ class ProgressService {
 
       // For now, return basic skills analysis based on overall scores
       // This can be enhanced with more detailed feedback analysis
-      const sessions = sessionsSnapshot.docs.map(doc => doc.data())
-      const avgScore = sessions.reduce((sum: number, s: any) => sum + (s.overallScore || 0), 0) / sessions.length
+      const avgScore = sessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / sessions.length
 
       return [
         { skill: 'Speaking', current: Math.round((avgScore * 0.9) * 10) / 10, target: 8.0, improvement: 0.3 },
@@ -301,19 +328,28 @@ class ProgressService {
       const fourMonthsAgo = new Date()
       fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4)
       
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed'),
-        where('createdAt', '>=', fourMonthsAgo),
-        orderBy('createdAt', 'asc')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
-      const sessions = sessionsSnapshot.docs.map(doc => ({
+      const allSessions = sessionsSnapshot.docs.map(doc => ({
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate()
+        startTime: doc.data().startTime?.toDate()
       }))
+
+      // Filter by date and status in memory
+      const sessions = allSessions.filter((session: any) => {
+        return session.status === 'completed' && 
+               session.startTime && 
+               session.startTime >= fourMonthsAgo
+      }).sort((a: any, b: any) => {
+        const timeA = a.startTime?.getTime() || 0
+        const timeB = b.startTime?.getTime() || 0
+        return timeA - timeB
+      })
 
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
       const monthlyData: MonthlyData[] = []
@@ -324,13 +360,13 @@ class ProgressService {
         const monthName = monthNames[date.getMonth()]
         
         const monthSessions = sessions.filter((session: any) => {
-          if (!session.createdAt) return false
-          return session.createdAt.getMonth() === date.getMonth() && 
-                 session.createdAt.getFullYear() === date.getFullYear()
+          if (!session.startTime) return false
+          return session.startTime.getMonth() === date.getMonth() && 
+                 session.startTime.getFullYear() === date.getFullYear()
         })
 
         const avgScore = monthSessions.length > 0 
-          ? monthSessions.reduce((sum: number, s: any) => sum + (s.overallScore || 0), 0) / monthSessions.length 
+          ? monthSessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / monthSessions.length 
           : 0
 
         const timeSpent = monthSessions.reduce((total: number, session: any) => {
@@ -354,15 +390,19 @@ class ProgressService {
 
   async getRadarData(userId: string): Promise<RadarData[]> {
     try {
+      // Simplified query
       const sessionsQuery = query(
-        collection(db, 'user_sessions'),
-        where('userId', '==', userId),
-        where('status', '==', 'completed')
+        collection(db, 'sessions'),
+        where('userId', '==', userId)
       )
       
       const sessionsSnapshot = await getDocs(sessionsQuery)
+      const allSessions = sessionsSnapshot.docs.map(doc => doc.data())
       
-      if (sessionsSnapshot.docs.length === 0) {
+      // Filter completed sessions in memory
+      const sessions = allSessions.filter((s: any) => s.status === 'completed')
+      
+      if (sessions.length === 0) {
         return [
           { skill: 'Fluency', score: 0 },
           { skill: 'Vocabulary', score: 0 },
@@ -374,8 +414,7 @@ class ProgressService {
       }
 
       // Calculate based on overall performance
-      const sessions = sessionsSnapshot.docs.map(doc => doc.data())
-      const avgScore = sessions.reduce((sum: number, s: any) => sum + (s.overallScore || 0), 0) / sessions.length
+      const avgScore = sessions.reduce((sum: number, s: any) => sum + (s.averageScore || 0), 0) / sessions.length
       const normalizedScore = (avgScore / 10) * 100 // Convert to percentage
 
       return [
@@ -403,7 +442,7 @@ class ProgressService {
     if (sessions.length === 0) return 0
     
     const sessionDates = sessions
-      .map(s => s.createdAt)
+      .map(s => s.startTime)
       .filter(date => date)
       .sort((a, b) => b.getTime() - a.getTime())
 

@@ -1,17 +1,18 @@
 /**
  * Enhanced InterviewSession Component
  * 
- * Integrates the new AudioRecorder and AnalysisResults components
- * with Google Cloud Speech-to-Text and OpenAI analysis services
+ * Integrates AudioRecorder, AnalysisResults, Firebase session storage,
+ * Speech-to-Text, and OpenAI analysis services for complete interview practice
  */
 
-import React, { useState } from 'react'
-import { Clock, SkipForward, CheckCircle, ArrowRight, Home, RotateCcw } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Clock, SkipForward, CheckCircle, ArrowRight, Home, RotateCcw, Loader2 } from 'lucide-react'
 import AudioRecorder from './AudioRecorder'
 import AnalysisResults from './AnalysisResults'
 import type { AnswerAnalysis, InterviewQuestion } from '../services/openAIAnalysisService'
 import type { TranscriptionResult } from '../services/speechToTextService'
 import type { Question } from '../types/questions'
+import { firebaseSessionService } from '../services/firebaseSessionService'
 
 interface EnhancedInterviewSessionProps {
   questions: Question[]
@@ -36,6 +37,8 @@ interface SessionState {
   startTime: number
   analyses: AnswerAnalysis[]
   transcriptions: TranscriptionResult[]
+  isSaving: boolean
+  saveError: string | null
 }
 
 export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> = ({
@@ -50,12 +53,38 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
     isComplete: false,
     startTime: Date.now(),
     analyses: [],
-    transcriptions: []
+    transcriptions: [],
+    isSaving: false,
+    saveError: null
   })
 
   const [currentAnalysis, setCurrentAnalysis] = useState<AnswerAnalysis | null>(null)
   const [showAnalysis, setShowAnalysis] = useState(false)
   const [sessionId] = useState(() => `session_${Date.now()}_${userId}`)
+  const [firebaseSessionId, setFirebaseSessionId] = useState<string | null>(null)
+
+  // Initialize Firebase session on mount
+  useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        const fbSessionId = await firebaseSessionService.createSession(
+          userId,
+          'interview',
+          sessionType
+        )
+        setFirebaseSessionId(fbSessionId)
+        console.log('✅ Firebase session initialized:', fbSessionId)
+      } catch (error) {
+        console.error('❌ Failed to initialize Firebase session:', error)
+        setSessionState(prev => ({
+          ...prev,
+          saveError: 'Failed to initialize session. Your progress may not be saved.'
+        }))
+      }
+    }
+
+    initializeSession()
+  }, [userId, sessionType])
 
   // Convert Question to InterviewQuestion format
   const convertToInterviewQuestion = (question: Question): InterviewQuestion => ({
@@ -73,8 +102,9 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
 
   /**
    * Handle analysis completion for current question
+   * Saves answer and analysis to Firebase
    */
-  const handleAnalysisComplete = (analysis: AnswerAnalysis) => {
+  const handleAnalysisComplete = async (analysis: AnswerAnalysis) => {
     setCurrentAnalysis(analysis)
     setShowAnalysis(true)
     
@@ -83,6 +113,41 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
       ...prev,
       analyses: [...prev.analyses, analysis]
     }))
+
+    // Save to Firebase
+    if (firebaseSessionId) {
+      setSessionState(prev => ({ ...prev, isSaving: true, saveError: null }))
+      
+      try {
+        const transcription = sessionState.transcriptions[sessionState.transcriptions.length - 1]
+        
+        await firebaseSessionService.saveAnswer(firebaseSessionId, {
+          questionId: currentQuestion.id,
+          questionText: currentQuestion.text,
+          questionType: currentQuestion.type,
+          difficulty: currentQuestion.difficulty || 'medium',
+          transcription: transcription || {
+            transcript: analysis.transcript,
+            confidence: 0,
+            success: true,
+            processingTime: 0
+          },
+          analysis,
+          audioDuration: analysis.timeManagement.duration
+        })
+        
+        console.log('✅ Answer saved to Firebase')
+        setSessionState(prev => ({ ...prev, isSaving: false }))
+        
+      } catch (error) {
+        console.error('❌ Failed to save answer to Firebase:', error)
+        setSessionState(prev => ({
+          ...prev,
+          isSaving: false,
+          saveError: 'Failed to save your answer. Please check your connection.'
+        }))
+      }
+    }
   }
 
   /**
@@ -155,8 +220,9 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
 
   /**
    * Complete the entire interview session
+   * Saves final results to Firebase and updates user progress
    */
-  const completeSession = () => {
+  const completeSession = async () => {
     const totalDuration = Math.floor((Date.now() - sessionState.startTime) / 1000)
     const completedQuestions = sessionState.analyses.length
     const averageScore = completedQuestions > 0 
@@ -170,6 +236,24 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
       totalDuration,
       analyses: sessionState.analyses,
       sessionType
+    }
+
+    // Save to Firebase
+    if (firebaseSessionId) {
+      setSessionState(prev => ({ ...prev, isSaving: true }))
+      
+      try {
+        await firebaseSessionService.completeSession(firebaseSessionId, results)
+        console.log('✅ Session completed and saved to Firebase')
+      } catch (error) {
+        console.error('❌ Failed to complete session in Firebase:', error)
+        setSessionState(prev => ({
+          ...prev,
+          saveError: 'Failed to save final results. Your progress may not be fully saved.'
+        }))
+      } finally {
+        setSessionState(prev => ({ ...prev, isSaving: false }))
+      }
     }
 
     setSessionState(prev => ({ ...prev, isComplete: true }))
@@ -263,6 +347,20 @@ export const EnhancedInterviewSession: React.FC<EnhancedInterviewSessionProps> =
                 <Clock className="w-5 h-5 text-gray-600" />
                 <span className="text-gray-700 font-mono">{formatSessionTime()}</span>
               </div>
+              
+              {/* Save Status Indicator */}
+              {sessionState.isSaving && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Saving...</span>
+                </div>
+              )}
+              
+              {sessionState.saveError && (
+                <div className="text-sm text-red-600">
+                  ⚠️ {sessionState.saveError}
+                </div>
+              )}
             </div>
             <div className="text-sm text-gray-600">
               Question {sessionState.currentQuestionIndex + 1} of {questions.length}
